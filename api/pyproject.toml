@@ -1,0 +1,45 @@
+[project]
+name = "ecommerce-operation-assistant-api"
+version = "0.1.0"
+description = "FastAPI backend for Ecommerce Operation Assistant."
+readme = "README.md"
+authors = [
+    { name = "赵豪杰", email = "2377646616@qq.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "alembic",
+    "celery[redis]",
+    "cryptography",
+    "fastapi",
+    "httpx",
+    "langgraph",
+    "langgraph-checkpoint-postgres",
+    "opentelemetry-api",
+    "opentelemetry-exporter-otlp-proto-http",
+    "opentelemetry-sdk",
+    "psycopg[binary,pool]",
+    "pydantic-settings",
+    "pymysql",
+    "python-multipart",
+    "sqlalchemy",
+    "uvicorn[standard]",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.6",
+]
+
+[project.scripts]
+api = "app:main"
+
+[build-system]
+requires = ["uv_build>=0.12.1,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""
+module-name = "app"
