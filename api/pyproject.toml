@@ -43,3 +43,9 @@ build-backend = "uv_build"
 [tool.uv.build-backend]
 module-root = ""
 module-name = "app"
+
+[tool.ruff]
+# 与现有代码风格保持一致：默认 88 会命中 500+ 行误报，实际代码宽约 120
+line-length = 120
+target-version = "py312"
+exclude = ["alembic/versions"]

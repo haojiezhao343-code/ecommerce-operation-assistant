@@ -572,6 +572,7 @@ class CompetitorMonitor(TimestampMixin, Base):
     interval_days: Mapped[int] = mapped_column(default=1, nullable=False)
     last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     next_check_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    last_snapshot_id: Mapped[int | None] = mapped_column(ForeignKey("competitor_monitor_snapshots.id"))
     note: Mapped[str | None] = mapped_column(Text)
 
     product: Mapped[Product] = relationship(back_populates="competitor_monitors")
@@ -581,6 +582,10 @@ class CompetitorMonitor(TimestampMixin, Base):
         cascade="all, delete-orphan",
         foreign_keys="CompetitorMonitorSnapshot.monitor_id",
         order_by="CompetitorMonitorSnapshot.checked_at.desc()",
+    )
+    last_snapshot: Mapped["CompetitorMonitorSnapshot | None"] = relationship(
+        foreign_keys=[last_snapshot_id],
+        post_update=True,
     )
 class CompetitorMonitorSnapshot(Base):
     __tablename__ = "competitor_monitor_snapshots"

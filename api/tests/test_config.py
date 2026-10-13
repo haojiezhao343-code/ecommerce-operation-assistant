@@ -1,3 +1,9 @@
+"""Settings 单元测试。
+
+注意：Settings.model_config 把 env_file 固定为 api/.env，直接实例化会读取开发者
+本地的 .env，导致断言受本机配置影响（例如 AGENT_CHECKPOINT_PORT=6433）。
+这里统一传 _env_file=None 关闭 dotenv 加载，保证单测只依赖显式入参与类默认值。
+"""
 import pytest
 
 from app.core.config import Settings
@@ -7,6 +13,7 @@ def test_production_rejects_default_auth_secret() -> None:
     """验证“productionrejects默认认证密钥”场景,确保重构后仍满足预期业务与安全边界。"""
     with pytest.raises(ValueError, match="AUTH_SECRET_KEY must be set to a strong value in production"):
         Settings(
+            _env_file=None,
             DATABASE_URL="sqlite://",
             APP_ENV="production",
             AUTH_SECRET_KEY="dev-auth-secret-change-me",
@@ -17,6 +24,7 @@ def test_production_rejects_short_auth_secret() -> None:
     """验证“productionrejects短链认证密钥”场景,确保重构后仍满足预期业务与安全边界。"""
     with pytest.raises(ValueError, match="AUTH_SECRET_KEY must be set to a strong value in production"):
         Settings(
+            _env_file=None,
             DATABASE_URL="sqlite://",
             APP_ENV="prod",
             AUTH_SECRET_KEY="short-secret",
@@ -26,6 +34,7 @@ def test_production_rejects_short_auth_secret() -> None:
 def test_production_accepts_long_auth_secret() -> None:
     """验证“productionacceptslong认证密钥”场景,确保重构后仍满足预期业务与安全边界。"""
     settings = Settings(
+        _env_file=None,
         DATABASE_URL="sqlite://",
         APP_ENV="production",
         AUTH_SECRET_KEY="prod-secret-with-at-least-thirty-two-chars",
@@ -39,6 +48,7 @@ def test_checkpoint_url_password_is_validated_in_production() -> None:
     """验证“checkpointURLpassword判断validatedinproduction”场景,确保重构后仍满足预期业务与安全边界。"""
     with pytest.raises(ValueError, match="AGENT_CHECKPOINT_PASSWORD must be set to a strong value in production"):
         Settings(
+            _env_file=None,
             DATABASE_URL="sqlite://",
             APP_ENV="production",
             AUTH_SECRET_KEY="prod-secret-with-at-least-thirty-two-chars",
@@ -49,6 +59,7 @@ def test_checkpoint_url_password_is_validated_in_production() -> None:
 def test_checkpoint_url_includes_reserved_password_characters() -> None:
     """验证检查点连接串包含配置的密码。"""
     settings = Settings(
+        _env_file=None,
         DATABASE_URL="sqlite://",
         AGENT_CHECKPOINT_PASSWORD="secret@with:/reserved?characters",
     )

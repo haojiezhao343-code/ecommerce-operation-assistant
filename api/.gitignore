@@ -1,0 +1,29 @@
+# 环境变量（含密钥，禁止提交）
+.env
+.env.*
+!.env.example
+.env.bak
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+build/
+dist/
+
+# 测试 / lint 缓存
+.pytest_cache/
+.ruff_cache/
+
+# Celery beat 调度状态文件（本地运行时生成）
+celerybeat-schedule
+celerybeat-schedule.*
+
+# 运行时产物
+.logs/
+uploads/
+*.log
+
+# 迁移历史备份（已废弃的增量迁移链，勿提交）
+alembic/_legacy_versions_backup_*/

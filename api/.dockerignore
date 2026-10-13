@@ -1,0 +1,10 @@
+.env
+.env.*
+.venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
+.logs
+uploads
+alembic/_legacy_versions_backup_*

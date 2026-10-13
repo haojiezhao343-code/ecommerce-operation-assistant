@@ -1,11 +1,43 @@
+# ---------- 环境变量（含密钥，禁止提交） ----------
 .env
-.venv/
+.env.*
+!.env.example
+!.env.*.example
+.env-backup-*/
+
+# ---------- Python ----------
 __pycache__/
 *.py[cod]
+*.egg-info/
+.venv/
+build/
+dist/
+
+# ---------- 测试 / lint 缓存 ----------
 .pytest_cache/
 .ruff_cache/
+
+# ---------- 运行时产物 ----------
+uploads/
+.logs/
+*.log
+celerybeat-schedule*
+
+# ---------- 前端 ----------
 node_modules/
 .next/
-uploads/
+
+# ---------- 打包产物 ----------
 *.tar
 *.tar.gz
+
+# ---------- IDE ----------
+.idea/
+.vscode/
+
+# ---------- 系统文件 ----------
+.DS_Store
+Thumbs.db
+
+# ---------- WorkBuddy 会话数据 ----------
+.workbuddy/

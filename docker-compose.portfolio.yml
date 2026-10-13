@@ -1,0 +1,82 @@
+name: ecommerce-portfolio
+
+# 作品集展示专用编排：只跑 web + api + mysql 三个容器。
+# 相比 docker-compose.offline.yml 去掉了 Redis、Celery worker 与 PostgreSQL 检查点，
+# 异步任务改由 api 进程内联执行（TASK_QUEUE_BACKEND=inline）。
+# 适用环境：2C2G 轻量服务器对外展示，访客登录后浏览演示数据，不承担重负载任务。
+# 启动：docker compose -f docker-compose.portfolio.yml up -d
+services:
+  mysql:
+    image: mysql:8.4
+    command:
+      - --mysql-native-password=ON
+      - --innodb-buffer-pool-size=192M
+      - --performance-schema=OFF
+      - --max-connections=50
+    environment:
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}"
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-ecommerce_operation}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+    mem_limit: 512m
+
+  api:
+    image: ecommerce-operation-assistant-api:latest
+    environment:
+      DATABASE_URL: mysql+pymysql://root:${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}@mysql:3306/${MYSQL_DATABASE:-ecommerce_operation}
+      APP_ENV: ${APP_ENV:-production}
+      AUTH_SECRET_KEY: "${AUTH_SECRET_KEY:?set AUTH_SECRET_KEY in .env}"
+      # 作品集不连接 PostgreSQL 检查点，但 production 校验仍要求该值足够强，填随机串即可。
+      AGENT_CHECKPOINT_PASSWORD: "${AGENT_CHECKPOINT_PASSWORD:?set AGENT_CHECKPOINT_PASSWORD in .env}"
+      API_CORS_ORIGINS: ${API_CORS_ORIGINS:-http://127.0.0.1}
+      TASK_QUEUE_BACKEND: inline
+      AGENT_MAX_TOTAL_TOKENS: ${AGENT_MAX_TOTAL_TOKENS:-12000}
+      AGENT_MAX_REVISIONS: ${AGENT_MAX_REVISIONS:-1}
+      BOOTSTRAP_EMAIL: ${BOOTSTRAP_EMAIL:-}
+      BOOTSTRAP_PASSWORD: ${BOOTSTRAP_PASSWORD:-}
+      BOOTSTRAP_DISPLAY_NAME: ${BOOTSTRAP_DISPLAY_NAME:-Demo Owner}
+    volumes:
+      - api-uploads:/app/uploads
+    depends_on:
+      mysql:
+        condition: service_healthy
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+    restart: unless-stopped
+    mem_limit: 448m
+
+  web:
+    image: ecommerce-operation-assistant-web:latest
+    environment:
+      API_INTERNAL_BASE_URL: http://api:8000
+      # 留空时页面拼出的分享与资源链接走相对路径，自动指向访客实际访问的地址。
+      NEXT_PUBLIC_API_BASE_URL: ""
+    ports:
+      - "${WEB_PORT:-80}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/login').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+    mem_limit: 448m
+
+volumes:
+  mysql-data:
+  api-uploads:
