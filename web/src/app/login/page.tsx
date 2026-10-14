@@ -18,7 +18,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             <LockKeyhole className="h-5 w-5" aria-hidden="true" />
           </div>
           <div>
-            <p className="text-sm font-medium text-emerald-700">Ecommerce Operation Assistant</p>
+            <p className="text-sm font-medium text-emerald-700">麦克思汉堡 · 运营智能体</p>
             <h1 className="text-xl font-semibold">登录工作台</h1>
           </div>
         </div>

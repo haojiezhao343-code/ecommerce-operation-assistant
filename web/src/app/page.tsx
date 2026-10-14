@@ -121,7 +121,7 @@ export default async function Home({ searchParams }: HomeProps) {
 
         <header className="flex flex-col gap-4 border-b border-slate-200 pb-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-sm font-medium text-cyan-700">Ecommerce Operation Assistant</p>
+            <p className="text-sm font-medium text-cyan-700">麦克思汉堡 · 运营智能体</p>
             <h1 className="mt-2 text-2xl font-semibold tracking-normal text-slate-950 sm:text-3xl">
               多平台店铺运营工作台
             </h1>
