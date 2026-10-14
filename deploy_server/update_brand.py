@@ -10,7 +10,7 @@ from urllib.parse import unquote, urlparse
 
 import pymysql
 
-OLD = [("美事堡", "贝克汉堡"), ("美堡", "贝克")]
+OLD = [("贝克汉堡", "麦克思汉堡"), ("贝克", "麦克思")]
 
 _url = os.environ["DATABASE_URL"]
 _p = urlparse(_url)
