@@ -18,7 +18,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             <LockKeyhole className="h-5 w-5" aria-hidden="true" />
           </div>
           <div>
-            <p className="text-sm font-medium text-emerald-700">麦克思汉堡 · 运营智能体</p>
+            <p className="text-sm font-medium text-blue-700">麦克思汉堡 · 运营智能体</p>
             <h1 className="text-xl font-semibold">登录工作台</h1>
           </div>
         </div>
@@ -36,7 +36,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               name="email"
               type="email"
               required
-              className="mt-2 h-11 w-full rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+              className="mt-2 h-11 w-full rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-blue-700 focus:ring-4 focus:ring-blue-100"
               placeholder="owner@example.com"
             />
           </label>
@@ -46,7 +46,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               name="password"
               type="password"
               required
-              className="mt-2 h-11 w-full rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+              className="mt-2 h-11 w-full rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-blue-700 focus:ring-4 focus:ring-blue-100"
               placeholder="输入密码"
             />
           </label>
