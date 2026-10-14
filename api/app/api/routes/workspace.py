@@ -50,15 +50,15 @@ SessionDep = Annotated[Session, Depends(get_db)]
 
 
 PERFORMANCE_TEMPLATE = """product_name,external_product_id,period_start,period_end,impressions,clicks,conversions,spend,revenue,notes
-美堡-香辣鸡腿中国汉堡,demo-spicy-chicken-burger,2026-05-01,2026-05-07,12000,420,38,860.00,3420.00,首周冷启动
+贝克-香辣鸡腿中国汉堡,demo-spicy-chicken-burger,2026-05-01,2026-05-07,12000,420,38,860.00,3420.00,首周冷启动
 """
 
 PRODUCT_TEMPLATE = """store_name,platform,name,category,price,cost,target_audience,selling_points,external_product_id,platform_status
-美事堡抖音旗舰店,douyin,美堡-香辣鸡腿中国汉堡,汉堡,15.00,6.50,追求性价比的学生和上班族,"现烤饼皮;香辣多汁;招牌必点",demo-spicy-chicken-burger,online
+贝克汉堡抖音旗舰店,douyin,贝克-香辣鸡腿中国汉堡,汉堡,15.00,6.50,追求性价比的学生和上班族,"现烤饼皮;香辣多汁;招牌必点",demo-spicy-chicken-burger,online
 """
 
 SKU_INVENTORY_TEMPLATE = """product_name,sku_code,sku_name,price,cost,initial_quantity,warning_threshold,location,external_sku_id
-美堡-香辣鸡腿中国汉堡,BURGER-SINGLE,单品,15.00,6.50,100,20,门店仓,demo-burger-single
+贝克-香辣鸡腿中国汉堡,BURGER-SINGLE,单品,15.00,6.50,100,20,门店仓,demo-burger-single
 """
 
 FIELD_MAPPING_TEMPLATE = """source_field,target_field,required,description
@@ -207,11 +207,11 @@ def create_demo_workspace(
 
     store = Store(
         workspace_id=workspace_id,
-        name="美事堡抖音旗舰店",
+        name="贝克汉堡抖音旗舰店",
         platform=Platform.DOUYIN,
         external_store_id="demo-meishibao-store",
         owner_name="运营负责人",
-        note="用于 V1 工作台演示的美事堡中国汉堡连锁数据，不代表真实经营数据。",
+        note="用于 V1 工作台演示的贝克汉堡中国汉堡连锁数据，不代表真实经营数据。",
     )
     db.add(store)
     db.flush()
@@ -219,7 +219,7 @@ def create_demo_workspace(
     platform_account = PlatformAccount(
         store=store,
         platform=Platform.DOUYIN,
-        account_name="美事堡抖音账号",
+        account_name="贝克汉堡抖音账号",
         external_account_id="demo-meishibao-account",
         auth_metadata={"授权状态": "演示占位", "说明": "不包含真实 token、cookie 或密码。"},
         note="演示账号只用于展示授权流程边界。",
@@ -230,7 +230,7 @@ def create_demo_workspace(
         Product(
             workspace_id=workspace_id,
             store=store,
-            name="美堡-香辣鸡腿中国汉堡",
+            name="贝克-香辣鸡腿中国汉堡",
             platform=Platform.DOUYIN,
             category="汉堡",
             price=Decimal("15.00"),
@@ -243,7 +243,7 @@ def create_demo_workspace(
         Product(
             workspace_id=workspace_id,
             store=store,
-            name="美堡-北京烤鸭中国汉堡",
+            name="贝克-北京烤鸭中国汉堡",
             platform=Platform.DOUYIN,
             category="汉堡",
             price=Decimal("21.00"),
@@ -256,7 +256,7 @@ def create_demo_workspace(
         Product(
             workspace_id=workspace_id,
             store=store,
-            name="美堡-藤椒鸡腿中国汉堡",
+            name="贝克-藤椒鸡腿中国汉堡",
             platform=Platform.DOUYIN,
             category="汉堡",
             price=Decimal("16.00"),
@@ -269,7 +269,7 @@ def create_demo_workspace(
         Product(
             workspace_id=workspace_id,
             store=store,
-            name="美堡-塔塔香鸡腿",
+            name="贝克-塔塔香鸡腿",
             platform=Platform.DOUYIN,
             category="小食",
             price=Decimal("12.80"),
@@ -282,7 +282,7 @@ def create_demo_workspace(
         Product(
             workspace_id=workspace_id,
             store=store,
-            name="美堡-冰柠可乐",
+            name="贝克-冰柠可乐",
             platform=Platform.DOUYIN,
             category="饮品",
             price=Decimal("7.00"),

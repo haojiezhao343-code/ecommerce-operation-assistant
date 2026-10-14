@@ -36,7 +36,7 @@ export function ProductCreateForm({ stores = [] }: ProductCreateFormProps) {
           name="name"
           required
           className="mt-2 h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-          placeholder="例如：美堡-香辣鸡腿中国汉堡"
+          placeholder="例如：贝克-香辣鸡腿中国汉堡"
         />
       </label>
 
