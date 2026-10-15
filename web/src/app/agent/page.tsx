@@ -185,6 +185,9 @@ const agentCss = `
     font-family: var(--font-mono); font-size: var(--fs-mini); line-height: 1.7; color: var(--fg-secondary);
   }
   .trace-dot.fail { background: var(--accent); }
+  /* 编排链（移植 7954 chat.html 的 .trace-name；.trace 容器/步骤/点/耗时由 design-system.css 提供） */
+  .trace-name { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem .5rem; min-width: 0; font-weight: 600; }
+  .trace-step-desc { font-family: var(--font-mono); font-size: var(--fs-mini); font-weight: 400; color: var(--faint); }
 
   /* --- 审批收件箱 ---------------------------------------------------- */
   .approval-wrap { display: flex; flex-direction: column; gap: var(--sp-4); }
@@ -867,9 +870,20 @@ function TemplateCard({
       <p className="wf-desc">{workflow.description}</p>
       <div className="wf-block">
         <span>专家链 · AGENTS</span>
-        <div className="tag-row">
-          {workflow.agents.map((agent) => (
-            <span key={agent} className="tag">{humanizeAgent(agent)}</span>
+        <div className="trace" aria-label="工作流专家编排链">
+          <div className="trace-hd">
+            <span>编排链 · ORCHESTRATION</span>
+            <span className="mono-faint">协调者 → {workflow.agents.length} 位专家</span>
+          </div>
+          {workflow.agents.map((agent, idx) => (
+            <div className="trace-step" key={agent}>
+              <span className="trace-dot done" aria-hidden="true"></span>
+              <span className="trace-name">
+                {humanizeAgent(agent)}
+                <span className="trace-step-desc">{agent}</span>
+              </span>
+              <span className="trace-time mono">{String(idx + 1).padStart(2, "0")} / {String(workflow.agents.length).padStart(2, "0")}</span>
+            </div>
           ))}
         </div>
       </div>
