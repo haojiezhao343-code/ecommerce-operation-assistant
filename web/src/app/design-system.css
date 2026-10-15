@@ -1,0 +1,609 @@
+/* ==========================================================================
+   多智能体运营平台 · 统一设计系统 v1
+   --------------------------------------------------------------------------
+   本文件是 designs/ 目录下 12 个子页面设计稿的唯一视觉来源。
+    作品集首页（仓库根 index.html）使用独立内联样式，不依赖本文件。
+   任何页面都不得自定义颜色/圆角/阴影/字体 —— 只能消费这里的 token。
+
+   视觉语言：印刷技术规格书（Swiss engineering monograph）
+     · 暖纸底 + 碳素墨 + 工程朱红 + 信号翠绿
+     · 零渐变 / 零辉光 / 零玻璃拟态 / 零投影
+     · 1px 发丝线，圆角统一 2px
+     · 衬线标题（宋体系）+ 无衬线正文 + 等宽标签
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Tokens
+   -------------------------------------------------------------------------- */
+:root {
+  /* 表面 */
+  --bg:            oklch(97.6% 0.004 85);
+  --surface:       oklch(99.3% 0.002 85);
+  --surface-subtle:oklch(94.8% 0.006 85);
+  --surface-sunken:oklch(96.2% 0.005 85);
+
+  /* 墨色（浅色档位 18/32/41/51：相邻档 ≥9 L，13px 小标签按最浅的 tint 底实测仍 ≥4.9:1） */
+  --fg:            oklch(18% 0.014 250);
+  --fg-secondary:  oklch(32% 0.014 250);
+  --muted:         oklch(41% 0.012 250);   /* 13-15px 次级文字：对最浅底实测 ≥7.5:1 */
+  --faint:         oklch(51% 0.010 250);   /* 表格 th / eyebrow / 时间戳：对最浅底实测 ≥4.9:1 */
+
+  /* 线 */
+  --border:        oklch(86% 0.007 85);
+  --border-strong: oklch(20% 0.014 250);
+  --border-accent: oklch(72% 0.09 28);
+  /* 语义描边：徽标专用边框档（比语义墨色浅一档、与各自 tint 底搭配）。
+     值与原 badge 规则里的 oklch 字面量逐字节相同 —— 纯抽 token，零视觉变化。 */
+  --border-success: oklch(72% 0.07 152);
+  --border-warn:    oklch(78% 0.07 70);
+  --border-info:    oklch(78% 0.07 245);
+
+  /* 语义色：朱红=主行动/当前；翠绿=系统在线；琥珀=进行中；蓝=信息 */
+  --accent:        oklch(48% 0.165 28);
+  /* 一个 accent token 想同时当「实心按钮底」和「文字/边框」是无解的：
+     当底要够暗才配得上近白字，当文字要够亮才压得住深色 tint 底。
+     浅色档 48% 恰好两头都够（白字 6.9:1 / 对 tint 底 6.1:1），所以浅色两份同值；
+     深色档必须拆成「墨 --accent」与「面 --accent-solid」两个 token。 */
+  --accent-solid:  oklch(48% 0.165 28);   /* 朱红「面」：实心按钮底，配 --on-accent 近白字 6.9:1 */
+  --accent-hover:  oklch(40% 0.165 28);   /* 实心按钮悬停：浅色下比 rest 暗一档 */
+  --accent-tint:   oklch(95% 0.025 28);
+  --on-accent:     oklch(99% 0 0);   /* 实心朱红上的文字：近白纸色，供按钮/徽标配对 */
+  --success:       oklch(46% 0.135 152);
+  --success-tint:  oklch(94.5% 0.03 152);
+  --warn:          oklch(52% 0.13 70);
+  --warn-tint:     oklch(95% 0.03 70);
+  --info:          oklch(45% 0.13 245);
+  --info-tint:     oklch(95% 0.02 245);
+
+  /* 字体 */
+  --font-display: 'Songti SC', 'STSong', 'Source Han Serif SC', 'Noto Serif CJK SC',
+                  'SimSun', 'Iowan Old Style', 'Charter', Georgia, serif;
+  --font-body:    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI',
+                  'Microsoft YaHei', 'Source Han Sans SC', 'Noto Sans CJK SC',
+                  system-ui, -apple-system, sans-serif;
+  --font-mono:    'JetBrains Mono', 'IBM Plex Mono', 'SFMono-Regular', Consolas,
+                  'Liberation Mono', Menlo, monospace;
+
+  /* 字阶（每档都带 px 下限，投屏可读性优先） */
+  --fs-display: clamp(2rem,     1.2rem + 3.4vw,  4.25rem);
+  --fs-h1:      clamp(1.5rem,   1.1rem + 1.7vw,  2.375rem);
+  --fs-h2:      clamp(1.25rem,  1.1rem + 0.7vw,  1.75rem);
+  --fs-h3:      1.1875rem;
+  --fs-lead:    clamp(1rem,     .95rem + .25vw,  1.1875rem);
+  --fs-body:    1rem;
+  --fs-meta:    0.9375rem;
+  --fs-mini:    0.8125rem;   /* mono 小标签下限 13px，投影必读 */
+
+  /* 间距：4px 网格 */
+  --sp-1: .25rem;  --sp-2: .5rem;   --sp-3: .75rem;  --sp-4: 1rem;
+  --sp-5: 1.5rem;  --sp-6: 2rem;    --sp-7: 3rem;    --sp-8: 4rem;
+  --pad-x: clamp(1rem, 3.2vw, 3rem);
+  --gap-section: clamp(3rem, 6vw, 5.5rem);
+
+  /* 形状与动效 */
+  --radius: 2px;
+  --ease-enter: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --ease-exit:  cubic-bezier(0.3, 0, 0.8, 0.15);
+  --ease-state: cubic-bezier(0.2, 0, 0, 1);
+  --ease-loop:  cubic-bezier(0.45, 0.05, 0.55, 0.95);
+  --t-2: 160ms;  --t-3: 260ms;  --t-4: 420ms;
+
+  --max-w: 1320px;   /* 内容最大宽度：由「一屏能舒服放几栏」推导 */
+}
+
+[data-theme="dark"] {
+  --bg:            oklch(15.5% 0.01 250);
+  --surface:       oklch(19% 0.012 250);
+  --surface-subtle:oklch(22.5% 0.014 250);
+  --surface-sunken:oklch(17% 0.011 250);
+  /* 墨色（深色档位 93.5/82/74/67：相邻档 ≥7 L，faint 仍比 muted 暗一档、可分层） */
+  --fg:            oklch(93.5% 0.005 85);
+  --fg-secondary:  oklch(82% 0.008 250);
+  --muted:         oklch(74% 0.01 250);    /* 13-15px 次级文字：对最亮的 tint 底实测 ≥6.3:1 */
+  --faint:         oklch(67% 0.01 250);    /* 表格 th / eyebrow / 时间戳：对最亮的 --warn-tint 实测 ≥5.2:1 */
+  --border:        oklch(28% 0.012 250);
+  --border-strong: oklch(84% 0.006 85);
+  --border-accent: oklch(52% 0.10 28);
+  /* 徽标描边档双主题同值：它们只与各自的 tint 底搭配，tint 已随主题翻深，
+     描边保持同值即维持原视觉；token 位先留好，将来要按主题分档只改这里。 */
+  --border-success: oklch(72% 0.07 152);
+  --border-warn:    oklch(78% 0.07 70);
+  --border-info:    oklch(78% 0.07 245);
+  /* 朱红「墨」：文字 / 边框 / 图标，对最亮的深色底实测 ≥5.5:1（色相固定 30） */
+  --accent:        oklch(70% 0.15 30);
+  /* 朱红「面」：实心按钮底。--on-accent 是近白纸色，57% 时实测 4.71:1（≥4.5）；
+     hover 只比 rest 亮 5 档而不是原来的 7 档——白字对比随底色变亮衰减极快
+     （72% 时只剩 2.59:1，实测 2.59，该组合未被使用），5 档是「看得出悬停」与「字还认得清（3.81:1）」的平衡点。 */
+  --accent-solid:  oklch(57% 0.17 30);
+  --accent-hover:  oklch(62% 0.16 30);
+  --accent-tint:   oklch(24% 0.045 28);
+  --on-accent:     oklch(99% 0 0);   /* 实心朱红「面」上的文字仍取近白纸色 */
+  --success:       oklch(68% 0.145 152);
+  --success-tint:  oklch(23% 0.04 152);
+  --warn:          oklch(70% 0.12 70);
+  --warn-tint:     oklch(26% 0.04 70);
+  --info:          oklch(68% 0.12 245);
+  --info-tint:     oklch(24% 0.04 245);
+}
+
+/* --------------------------------------------------------------------------
+   2. Reset & base
+   -------------------------------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  scroll-behavior: smooth;
+}
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--fg);
+  line-height: 1.75;
+  font-size: var(--fs-body);
+  font-variant-numeric: tabular-nums;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  /* 中文排版核心开关：默认值是 no-autospace，不显式写等于没开 */
+  text-autospace: normal;
+}
+@media (max-width: 767px) { body { line-height: 1.85; } }
+
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+input, textarea, select { font: inherit; color: inherit; }
+ul { list-style: none; }
+
+h1, h2, h3, h4 {
+  font-weight: 700;
+  color: var(--fg);
+  line-height: 1.3;
+  letter-spacing: 0;          /* 汉字负字距会撞字，一律 0 */
+  text-wrap: balance;
+}
+h1, .t-display { font-family: var(--font-display); font-weight: 700; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+
+/* --------------------------------------------------------------------------
+   3. 图标（24 网格 / 描边 1.5 / round / currentColor）
+   -------------------------------------------------------------------------- */
+.ic { width: 1em; height: 1em; flex: none; vertical-align: -.125em; overflow: visible; }
+.ic-sm { width: .875em; height: .875em; }
+.ic-lg { width: 1.25em; height: 1.25em; }
+.mark { width: 1em; height: 1em; flex: none; fill: currentColor; vertical-align: -.125em; }
+
+/* --------------------------------------------------------------------------
+   4. 排版工具类
+   -------------------------------------------------------------------------- */
+.t-display { font-family: var(--font-display); font-size: var(--fs-display); line-height: 1.14; letter-spacing: 0; }
+.t-h1 { font-size: var(--fs-h1); line-height: 1.2; }
+.t-h2 { font-size: var(--fs-h2); line-height: 1.28; }
+.t-h3 { font-size: var(--fs-h3); line-height: 1.42; }
+.t-lead { font-size: var(--fs-lead); line-height: 1.85; color: var(--fg-secondary); max-width: 34em; }
+.t-meta { font-size: var(--fs-meta); color: var(--muted); }
+.t-mini { font-size: var(--fs-mini); color: var(--muted); }
+
+/* 眉标：全大写拉丁是 letter-spacing 唯一该放开的场景 */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mini);
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+/* --------------------------------------------------------------------------
+   5. 按钮
+   -------------------------------------------------------------------------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .5em;
+  height: 44px; padding: 0 1.25rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--fg);
+  font-size: var(--fs-meta); font-weight: 600;
+  letter-spacing: .01em;
+  white-space: nowrap;
+  transition: background-color var(--t-2) var(--ease-state),
+              border-color var(--t-2) var(--ease-state),
+              color var(--t-2) var(--ease-state);
+}
+.btn-primary { background: var(--accent-solid); border-color: var(--accent-solid); color: var(--on-accent); }
+.btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn:hover:not(.btn-primary) { border-color: var(--border-strong); background: var(--surface-subtle); }
+/* 小号按钮：触达目标仍守 44px 高（WCAG 2.5.5），只收窄内边距保持视觉比例，字号不变 */
+.btn-sm { height: 44px; padding: 0 1rem; font-size: var(--fs-mini); }
+.btn-ghost { border-color: var(--border); background: transparent; color: var(--fg-secondary); }
+.btn:disabled, .btn[aria-disabled="true"] { opacity: .45; pointer-events: none; }
+
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover { transform: translateY(-1px); }
+}
+@media (hover: none) {
+  .btn:active { background: var(--surface-subtle); }
+}
+
+/* --------------------------------------------------------------------------
+   6. 徽标 / 标签
+   -------------------------------------------------------------------------- */
+.badge {
+  display: inline-flex; align-items: center; gap: .4em;
+  padding: .2em .55em;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: var(--fs-mini);
+  font-weight: 600; letter-spacing: .04em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.badge-online { color: var(--success); border-color: var(--border-success); background: var(--success-tint); }
+.badge-accent { color: var(--accent); border-color: var(--border-accent); background: var(--accent-tint); }
+.badge-warn   { color: var(--warn);   border-color: var(--border-warn);   background: var(--warn-tint); }
+.badge-info   { color: var(--info);   border-color: var(--border-info);   background: var(--info-tint); }
+.badge-solid  { background: var(--fg); border-color: var(--fg); color: var(--bg); }
+
+/* 技术栈标签：零阴影、细边框、无逐框架品牌色 */
+.tag-row { display: flex; flex-wrap: wrap; gap: .375rem .5rem; }
+.tag {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mini);
+  padding: .3em .625em;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--fg-secondary);
+}
+
+/* --------------------------------------------------------------------------
+   7. 状态指示动画（状态灯 / 骨架 / 流式光标）
+   无限动画仅限状态指示（状态灯 / 骨架屏 / 流式光标），禁止装饰性无限动画；
+   同一视口同时呼吸的元素建议 ≤8，超出时用 animation-delay 错峰，避免整屏同频闪烁。
+   -------------------------------------------------------------------------- */
+.status-led {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--success);
+  flex: none;
+  transform-origin: 50% 50%;
+  animation: led-breathe 2.8s var(--ease-loop) infinite;
+}
+.status-led.is-off { background: var(--muted); animation: none; }
+.status-led.is-busy { background: var(--warn); animation-duration: 1.4s; }
+@keyframes led-breathe {
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%      { opacity: .45; transform: scale(.82); }
+}
+
+/* --------------------------------------------------------------------------
+   8. 应用外壳（子页面统一骨架）
+   -------------------------------------------------------------------------- */
+.app { display: grid; grid-template-rows: auto 1fr; min-height: 100vh; }
+
+.app-top {
+  position: sticky; top: 0; z-index: 40;
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4);
+  height: 60px; padding: 0 var(--pad-x);
+  border-bottom: 1px solid var(--border);
+  /* 动效规格禁用 backdrop-filter（Chrome/Edge 屏幕共享下会渲染成黑块，本稿含投屏场景），
+     故用不透明实底保证吸顶栏在任何共享/录屏下都稳定 */
+  background: var(--bg);
+}
+/* 品牌链接命中区：文字行高只有 28px，触摸端点击目标不够（WCAG 2.5.5 要求 ≥44px），
+   但不许动盒子的尺寸 —— 60px 顶栏的垂直居中、≤899 两行顶栏的行高都不许被顶动，
+   页面里另有本地 min-height:44px 的写法（store-detail / generation-job）也不许被顶坏。
+   手法：position:relative + ::after 伪元素上下各探 8px 扩出命中区：
+   · ≥900 单行档：品牌盒约 28px（居中于 60px 栏）→ 命中 44px；本地 44px 盒 → 命中 60px；
+   · ≤899 两行档：栏顶内边距正好 8px，伪元素上缘贴栏顶、下缘探进行间距 → 命中 ≥45.6px；
+     下探搭在导航行顶缘的 4px（brand 的 x 范围内）由导航项让出，导航仍有 ≥40px 有效命中高。
+   伪元素不参与布局、不绘制任何像素 —— 所有页面盒高与文字位置零变化。
+   inset 控制在 ±8px：探出栏外的伪元素矩形会扰动 Chrome 栅格化，顶栏底缘发丝线与
+   导航文字会出现不可见的亚像素 AA 抖动（实测 diff 从 ~14px 涨到 ~420px），故不取更大值。 */
+.app-top .brand {
+  display: flex; align-items: center; gap: .5rem; font-weight: 700; font-size: 1rem;
+  position: relative;
+}
+.app-top .brand::after { content: ''; position: absolute; inset: -8px 0 -8px; }
+.app-top .brand .sub { font-family: var(--font-mono); font-size: var(--fs-mini); font-weight: 400; color: var(--faint); }
+.app-top nav { display: flex; align-items: center; gap: .25rem; }
+.app-top nav a {
+  /* 命中区 44px：用 flex 行高内撑 + min-height，padding-block 归零，
+     所以顶栏 60px 的视觉高度不变、导航项也不会把顶栏顶高或换行 */
+  display: inline-flex; align-items: center;
+  min-height: 44px; padding: 0 .7rem; border-radius: var(--radius);
+  font-size: var(--fs-meta); color: var(--muted);
+  transition: color var(--t-2) var(--ease-state), background var(--t-2) var(--ease-state);
+}
+.app-top nav a:hover { color: var(--fg); background: var(--surface-subtle); }
+.app-top nav a[aria-current="page"] { color: var(--fg); background: var(--surface-subtle); }
+
+.app-body { display: grid; min-height: 0; }
+.app-body.has-rail { grid-template-columns: 248px minmax(0, 1fr); }
+.app-body.has-aside { grid-template-columns: minmax(0, 1fr) 340px; }
+
+.rail {
+  border-right: 1px solid var(--border);
+  padding: var(--sp-5) var(--sp-4);
+  display: flex; flex-direction: column; gap: var(--sp-5);
+}
+.aside {
+  border-left: 1px solid var(--border);
+  padding: var(--sp-5) var(--sp-4);
+  overflow-y: auto;
+}
+.pane { padding: var(--sp-5) var(--pad-x); min-width: 0; }
+
+/* --------------------------------------------------------------------------
+   9. 面板 / 卡片
+   -------------------------------------------------------------------------- */
+.panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.panel-head {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-subtle);
+}
+.panel-head h3 { font-size: var(--fs-h3); }
+.panel-body { padding: var(--sp-4); }
+
+/* 主智能体 = 反白实心块；子智能体 = 浅底描边。这是"1 主 4 子"的视觉语言 */
+.panel-inverted { background: var(--fg); border-color: var(--fg); color: var(--bg); }
+.panel-inverted h3, .panel-inverted .eyebrow { color: var(--bg); }
+.panel-inverted p { color: color-mix(in oklch, var(--bg) 78%, var(--fg)); }
+
+/* --------------------------------------------------------------------------
+   10. 表格
+   -------------------------------------------------------------------------- */
+.tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-meta); }
+.tbl th {
+  text-align: left; padding: .625rem var(--sp-3);
+  font-family: var(--font-mono); font-size: var(--fs-mini); font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--faint);
+  border-bottom: 1px solid var(--border-strong);
+  white-space: nowrap;
+}
+.tbl td { padding: .75rem var(--sp-3); border-bottom: 1px solid var(--border); vertical-align: top; }
+.tbl tbody tr:last-child td { border-bottom: 0; }
+.tbl-wrap { overflow-x: auto; overscroll-behavior-x: contain; }
+/* 表格说明条（地基标准版）—— 说明文字放滚动容器外的规范用法。
+   刻意只统一「文字三属性」（字号/颜色/上内边距）：各页面已有的本地定义
+   （简版或完整页脚条）都恰好覆盖这三个属性，按层叠仍原样生效，向后兼容零变化；
+   更重的页脚条形态（描边/底色/flex）属页面级扩展，不进地基 —— 否则会从
+   cascade 漏进从简使用的页面，那才是真正的视觉回归。
+   从未定义过 .tbl-note 的页面（agent / login）自此获得标准文字形态。 */
+.tbl-note { font-size: var(--fs-mini); color: var(--muted); padding: .5rem 0 0; }
+
+/* --------------------------------------------------------------------------
+   11. 表单
+   -------------------------------------------------------------------------- */
+.field { display: flex; flex-direction: column; gap: .375rem; }
+.field > label { font-family: var(--font-mono); font-size: var(--fs-mini); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); }
+.input {
+  height: 44px; padding: 0 .75rem;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); color: var(--fg);
+  transition: border-color var(--t-2) var(--ease-state);
+}
+.input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+textarea.input { height: auto; padding: .625rem .75rem; line-height: 1.7; resize: vertical; }
+.input::placeholder { color: var(--faint); }
+
+/* --------------------------------------------------------------------------
+   12. 对话气泡（RAG / 客服 / 调研三页共用）
+   -------------------------------------------------------------------------- */
+.msg { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: var(--sp-3); }
+.msg-avatar {
+  width: 28px; height: 28px; border-radius: var(--radius);
+  display: grid; place-items: center;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+}
+.msg-avatar.bot { background: var(--fg); color: var(--bg); }
+.msg-avatar.me  { background: var(--surface-subtle); color: var(--fg-secondary); border: 1px solid var(--border); }
+.msg-body { min-width: 0; }
+.msg-body > p + p { margin-top: .75rem; }
+.msg-time { font-family: var(--font-mono); font-size: var(--fs-mini); color: var(--faint); }
+.msg-user .msg-body {
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: .75rem 1rem;
+}
+
+/* RAG 引用来源卡 —— 原系统完全缺失，这是 RAG 产品最该有的一层信息 */
+.cite {
+  margin-top: .75rem;
+  border: 1px solid var(--border); border-left: 2px solid var(--accent);
+  border-radius: var(--radius); background: var(--surface-sunken);
+  padding: .75rem .875rem;
+}
+.cite-hd { display: flex; align-items: center; gap: .5rem; margin-bottom: .375rem; }
+.cite-hd .doc { font-weight: 600; font-size: var(--fs-meta); }
+.cite-hd .pg  { font-family: var(--font-mono); font-size: var(--fs-mini); color: var(--muted); }
+.cite-body { font-size: var(--fs-meta); color: var(--muted); line-height: 1.7; }
+.cite-score { font-family: var(--font-mono); font-size: var(--fs-mini); color: var(--accent); }
+
+/* 运行轨迹：Agent 内部状态必须是一等公民，而不是日志尾巴 */
+.trace { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); margin-bottom: var(--sp-4); }
+.trace-hd {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3);
+  padding: .625rem .875rem; border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono); font-size: var(--fs-mini); font-weight: 700;
+  letter-spacing: .06em; color: var(--muted);
+}
+.trace-step {
+  display: grid; grid-template-columns: 18px minmax(0,1fr) auto; gap: .75rem;
+  align-items: center; padding: .5rem .875rem;
+  border-bottom: 1px solid var(--border-soft, var(--border));
+  font-size: var(--fs-meta);
+}
+.trace-step:last-child { border-bottom: 0; }
+.trace-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border-strong); justify-self: center; }
+.trace-dot.done { background: var(--success); }
+.trace-dot.run  { background: var(--warn); animation: led-breathe 1.4s var(--ease-loop) infinite; }
+.trace-dot.skip { background: var(--border); }
+.trace-time { font-family: var(--font-mono); font-size: var(--fs-mini); color: var(--faint); }
+
+/* --------------------------------------------------------------------------
+   13. 空状态
+   -------------------------------------------------------------------------- */
+.empty {
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  padding: var(--sp-7) var(--sp-5);
+  text-align: center;
+  color: var(--muted);
+}
+.empty h4 { font-size: var(--fs-h3); margin-bottom: .375rem; }
+.empty p { font-size: var(--fs-meta); max-width: 38em; margin: 0 auto; }
+
+/* --------------------------------------------------------------------------
+   14. 输入区（对话页底部）
+   -------------------------------------------------------------------------- */
+.composer {
+  border: 1px solid var(--border-strong); border-radius: var(--radius);
+  background: var(--surface);
+  display: grid; grid-template-columns: minmax(0,1fr) auto; gap: var(--sp-2);
+  padding: .5rem .5rem .5rem .875rem;
+  transition: border-color var(--t-2) var(--ease-state);
+}
+.composer:focus-within { border-color: var(--accent); }
+.composer textarea {
+  border: 0; background: none; resize: none; padding: .375rem 0;
+  line-height: 1.7; max-height: 160px;
+}
+.composer textarea:focus { outline: none; }
+
+/* --------------------------------------------------------------------------
+   15. 动效：reveal（隐藏态写在 no-preference 内，reduce 下根本不存在）
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: no-preference) {
+  .js .reveal { opacity: 0; transform: translateY(16px);
+    transition: opacity 240ms var(--ease-enter), transform var(--t-4) var(--ease-enter); }
+  .js .reveal.is-in { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+  .status-led { animation: none !important; opacity: 1 !important; }
+}
+
+/* --------------------------------------------------------------------------
+   16. 响应式（5 条断点，值由「每栏还能放多少中文字」推导）
+   -------------------------------------------------------------------------- */
+@media (max-width: 1023px) {
+  .app-body.has-rail { grid-template-columns: 200px minmax(0, 1fr); }
+  .app-body.has-aside { grid-template-columns: minmax(0, 1fr) 300px; }
+}
+@media (max-width: 899px) {
+  .app-body.has-rail,
+  .app-body.has-aside { grid-template-columns: minmax(0, 1fr); }
+  /* 平板档（768–899）：固定 60px 单行顶栏已经放不下「品牌 + 4~5 个中文导航项 + 操作区」。
+     继续硬撑只有两种坏结果：flex 最小内容宽度把整页顶宽，或导航项折行顶穿 60px 顶栏。
+     这里把顶栏降级成两行（品牌/操作区一行、导航一行横向滚动，与 ≤767 同套路），
+     用 min-height 保住 60px 的视觉底线。 */
+  .app-top { height: auto; min-height: 60px; flex-wrap: wrap; row-gap: .25rem; padding-block: .5rem; }
+  .app-top nav { width: 100%; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .app-top nav::-webkit-scrollbar { display: none; }
+  .app-top nav a { white-space: nowrap; }
+  .rail {
+    border-right: 0; border-bottom: 1px solid var(--border);
+    flex-direction: row; overflow-x: auto; gap: var(--sp-2);
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    /* 右缘渐隐提示 —— 本设计系统唯一一处 mask 渐变豁免：
+       ≤899 起 rail 横向滚动且滚动条被隐藏（scrollbar-width:none），
+       第三列常被切在视口边缘，用户看不出右边还有内容。
+       这是功能性渐隐（「此处可横向滚动」的可用性暗示），不是装饰：
+       · alpha 渐隐，不产生颜色渐变 / 辉光 / 玻璃感；
+       · overflow 仍为 auto，内容不被裁死，滚动、触摸拖拽都不受影响。
+       后人不要把它当违规渐变删掉。 */
+    -webkit-mask-image: linear-gradient(90deg, #000 0 88%, transparent 100%);
+            mask-image: linear-gradient(90deg, #000 0 88%, transparent 100%);
+  }
+  .rail::-webkit-scrollbar { display: none; }
+  .rail > * { flex: 0 0 auto; }
+  .aside { border-left: 0; border-top: 1px solid var(--border); }
+}
+@media (max-width: 767px) {
+  .app-top { height: auto; min-height: 56px; flex-wrap: wrap; padding-block: .5rem; }
+  .app-top nav { width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .app-top nav::-webkit-scrollbar { display: none; }
+  /* 导航项的 44px 命中区已在基础规则里给（min-height + inline-flex），这里只管侧轨 */
+  .rail > * { min-height: 44px; }
+  .btn { min-height: 48px; }
+  /* 表格防列塌缩（地基兜底）：窄屏下中文最小内容宽度只有 1 字，width:100% 会把
+     多列表格压成竖排。多个页面各自在内联 <style> 里抄过这份规则（max-width
+     880/960 不一）—— 页面样式表后于本 <link> 入场，本地定义仍然压住本规则，
+     已接入页面行为零变化；没写本地定义的页面从此获得同一兜底，新页面无需再抄。
+     与 .tbl-x { min-width:980px } 这类页面轨距同向：都归结为「滚动而不是挤塌」。 */
+  .tbl { width: max-content; min-width: 100%; max-width: 60rem; }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  /* 横屏矮窗：顶栏在 ≤899 已经降级成两行，不能再压回固定盒高，否则导航行会溢出盒外、
+     飘在页面内容上没有底色。用 min-height 保住「矮窗顶栏更矮」的原意，盒高交给内容。 */
+  .app-top { height: auto; min-height: 52px; }
+}
+
+/* 触摸端：hover 上浮在移动浏览器上会"粘住"，必须包进 hover:hover */
+@media (hover: none) {
+  .btn:active { transform: none; }
+}
+
+/* --------------------------------------------------------------------------
+   17. 打印（面试官可能打印一份带走）
+   -------------------------------------------------------------------------- */
+@media print {
+  /* 打印强制白底墨字：连深色主题也落回纸张配色。
+     只做 token 覆盖、不写裸色值 —— :root 与 [data-theme="dark"] 同权重复盖，
+     保证任何主题下打印都是白底墨字。
+     覆盖范围必须含「面 / 墨 / 语义 / 线」整组：深色主题的 surface 与 border-strong
+     是暗值，只改 --bg/--fg 会打出深底深字、发丝线消失的废纸。 */
+  :root, [data-theme="dark"] {
+    --bg: oklch(99.3% 0 0);
+    --surface: oklch(99.3% 0.002 85);
+    --surface-subtle: oklch(94.8% 0.006 85);
+    --surface-sunken: oklch(96.2% 0.005 85);
+    --fg: oklch(18% 0.014 250);
+    --fg-secondary: oklch(32% 0.014 250);
+    --muted: oklch(41% 0.012 250);
+    --faint: oklch(51% 0.010 250);
+    --border: oklch(86% 0.007 85);
+    --border-strong: oklch(20% 0.014 250);
+    --border-accent: oklch(72% 0.09 28);
+    --accent: oklch(48% 0.165 28);
+    --accent-solid: oklch(48% 0.165 28);
+    --accent-tint: oklch(95% 0.025 28);
+    --success: oklch(46% 0.135 152);
+    --success-tint: oklch(94.5% 0.03 152);
+    --warn: oklch(52% 0.13 70);
+    --warn-tint: oklch(95% 0.03 70);
+    --info: oklch(45% 0.13 245);
+    --info-tint: oklch(95% 0.02 245);
+  }
+  /* 横向 A4：可打印宽度 273mm ≈ 1032px，比竖版多约 40%，宽表换字号而不是丢列 */
+  @page { size: A4 landscape; margin: 12mm; }
+  .app-top, .composer, .btn { display: none !important; }
+  .panel, .msg-body, .cite { break-inside: avoid; }
+  /* 宽表（product-detail 13 张 / store-detail 4 张 / generation-job 2 张）：
+     屏幕端 .tbl-wrap 是横向滚动容器，打印时滚不出纸外，右列会被纸边切掉 25-40%。
+     这里放开滚动、让表格回抽到纸宽，用 10.5px 窄字号 + 允许断行换完整列。 */
+  .tbl-wrap { overflow: visible; }
+  .tbl {
+    width: 100% !important; max-width: 100% !important; min-width: 0 !important;
+    table-layout: auto; font-size: 10.5px;
+  }
+  /* 单元格左右 padding 从 12px 收到 4px：11 列表的 padding 就从 264px 降到 88px，
+     这是最宽一张表（1055px）回落到纸宽（932px）内的关键，比再砍字号更保可读性 */
+  .tbl th, .tbl td { padding: .375rem .25rem; white-space: normal; word-break: break-word; overflow-wrap: break-word; }
+}

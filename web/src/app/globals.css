@@ -1,58 +1,25 @@
+/* ==========================================================================
+   全局样式 · 设计系统接入
+   --------------------------------------------------------------------------
+   设计系统唯一真相源：src/app/design-system.css（自 designs/design-system.css 原样拷贝）。
+   接入方式（AGENTS.md §2.1）：
+     · @import 放在 Tailwind 之前，并落入 components 层 ——
+       设计系统的 reset / body / button 等基元素规则压过 Tailwind preflight（base 层），
+       Tailwind 工具类（utilities 层）仍可按需覆盖组件类；
+     · 两套颜色体系不混用：新页面只消费设计 token，既有组件的 Tailwind 工具类保持原样。
+   本文件只放接入与基座补丁，不引入任何新数值。
+   ========================================================================== */
+
+@import "./design-system.css" layer(components);
 @import "tailwindcss";
 
-:root {
-  --background: #f4f6fb;
-  --foreground: #0f172a;
-  --app-font-sans: "Inter", "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, Helvetica, sans-serif;
-  --app-font-mono: "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+/* ---- 应用级基座补丁（取值全部来自设计系统 token） ---- */
 
-  /* ── 商务简约色彩映射：cyan 家族统一收敛为商务蓝 ── */
-  --color-cyan-50: #f5f8ff;
-  --color-cyan-100: #e0e9fd;
-  --color-cyan-200: #c7d7fe;
-  --color-cyan-300: #a9c0fb;
-  --color-cyan-700: #1d4ed8;
-  --color-cyan-800: #1e40af;
-  --color-cyan-900: #1e3a8a;
-}
+/* 选中色：跟随朱红 tint 而不是默认蓝 */
+::selection { background: var(--accent-tint); color: var(--fg); }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--app-font-sans);
-  --font-mono: var(--app-font-mono);
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--app-font-sans);
-  font-variant-numeric: tabular-nums;
-  -webkit-font-smoothing: antialiased;
-}
-
-::selection {
-  background: #dbeafe;
-}
-
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
-
-button,
-input,
-select,
-textarea {
-  font: inherit;
-}
+/* 细滚动条：原实现写死了 #cbd5e1 / #94a3b8 裸色值，统一改为 token */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: var(--radius); }
+::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }

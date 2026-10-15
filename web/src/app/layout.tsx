@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Script from "next/script";
+
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -13,11 +15,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="zh-CN"
-      className="h-full antialiased"
-    >
-      <body className="min-h-full flex flex-col">{children}</body>
+    /* class="js"：.reveal 进场动画依赖它（AGENTS.md §2.1） */
+    <html lang="zh-CN" className="js">
+      <head>
+        {/* icons.js：IIFE 图标注入器 + 主题切换 + reveal，需客户端加载（AGENTS.md §2.1） */}
+        <Script src="/icons.js" strategy="beforeInteractive" />
+      </head>
+      <body>{children}</body>
     </html>
   );
 }
