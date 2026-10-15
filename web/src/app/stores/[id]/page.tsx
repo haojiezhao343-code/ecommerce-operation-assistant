@@ -61,7 +61,7 @@ export default async function StorePage({ params, searchParams }: StorePageProps
   const canEdit = Boolean(currentUser?.permissions.can_edit);
 
   return (
-    <main className="min-h-screen bg-[#f7f8fb] px-5 py-6 text-slate-950 lg:px-8">
+    <main className="min-h-screen bg-[#f4f6fb] px-5 py-6 text-slate-950 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
         <div>
           <Link

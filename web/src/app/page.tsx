@@ -80,7 +80,7 @@ export default async function Home({ searchParams }: HomeProps) {
   });
 
   return (
-    <main className="min-h-screen bg-[#f7f8fb] px-5 py-6 text-slate-950 lg:px-8">
+    <main className="min-h-screen bg-[#f4f6fb] px-5 py-6 text-slate-950 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
         <div className="flex justify-end gap-2">
           <Link
@@ -121,7 +121,7 @@ export default async function Home({ searchParams }: HomeProps) {
 
         <header className="flex flex-col gap-4 border-b border-slate-200 pb-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-sm font-medium text-cyan-700">麦克思汉堡 · 运营智能体</p>
+            <p className="text-sm font-medium text-cyan-700">运营智能体</p>
             <h1 className="mt-2 text-2xl font-semibold tracking-normal text-slate-950 sm:text-3xl">
               多平台店铺运营工作台
             </h1>

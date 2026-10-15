@@ -11,14 +11,14 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const error = Array.isArray(params.error) ? params.error[0] : params.error;
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#f7f8fb] px-5 py-10 text-slate-950">
+    <main className="flex min-h-screen items-center justify-center bg-[#f4f6fb] px-5 py-10 text-slate-950">
       <section className="w-full max-w-md rounded-md border border-slate-200 bg-white p-6">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-md bg-slate-950 text-white">
             <LockKeyhole className="h-5 w-5" aria-hidden="true" />
           </div>
           <div>
-            <p className="text-sm font-medium text-blue-700">麦克思汉堡 · 运营智能体</p>
+            <p className="text-sm font-medium text-blue-700">运营智能体</p>
             <h1 className="text-xl font-semibold">登录工作台</h1>
           </div>
         </div>

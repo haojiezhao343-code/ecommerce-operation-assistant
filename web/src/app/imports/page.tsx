@@ -29,7 +29,7 @@ const templates = [
 /** 渲染导入页面；在服务端加载业务数据，并把交互交给对应表单或客户端组件。 */
 export default function ImportCenterPage() {
   return (
-    <main className="min-h-screen bg-[#f7f8fb] px-5 py-6 text-slate-950 lg:px-8">
+    <main className="min-h-screen bg-[#f4f6fb] px-5 py-6 text-slate-950 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
         <div>
           <Link

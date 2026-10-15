@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "麦克思汉堡-多智能体运营平台 · 运营智能体",
+  title: "多智能体运营平台 · 运营智能体",
   description: "AI 单品运营工作台",
 };
 

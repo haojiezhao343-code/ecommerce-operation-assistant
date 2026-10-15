@@ -37,7 +37,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
 
   if (!settings) {
     return (
-      <main className="min-h-screen bg-[#f7f8fb] px-5 py-6 text-slate-950 lg:px-8">
+      <main className="min-h-screen bg-[#f4f6fb] px-5 py-6 text-slate-950 lg:px-8">
         <div className="mx-auto max-w-5xl">
           <BackLink />
           <div className="mt-6 rounded-md border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700">
@@ -49,7 +49,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f8fb] px-5 py-6 text-slate-950 lg:px-8">
+    <main className="min-h-screen bg-[#f4f6fb] px-5 py-6 text-slate-950 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
         <header className="flex flex-col gap-4 border-b border-slate-200 pb-5 lg:flex-row lg:items-end lg:justify-between">
           <div>

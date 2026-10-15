@@ -137,7 +137,7 @@ export default async function ProductDetailPage({ params, searchParams }: Produc
   const canEdit = Boolean(currentUser?.permissions.can_edit);
 
   return (
-    <main className="min-h-screen bg-[#f7f8fb] px-5 py-6 text-slate-950 lg:px-8">
+    <main className="min-h-screen bg-[#f4f6fb] px-5 py-6 text-slate-950 lg:px-8">
       <GenerationJobAutoRefresh active={hasActiveGenerationJobs} />
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
         <header className="flex flex-col gap-4 border-b border-slate-200 pb-5">

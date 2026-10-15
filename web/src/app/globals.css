@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f7f8fa;
+  --background: #f4f6fb;
   --foreground: #0f172a;
   --app-font-sans: "Inter", "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, Helvetica, sans-serif;
   --app-font-mono: "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
