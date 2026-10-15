@@ -14,6 +14,8 @@ export async function POST(request: Request, context: RouteContext) {
   const workspaceId = Number(formData.get("workspace_id"));
   const decision = formData.get("decision");
   const editedOutputText = String(formData.get("edited_output") ?? "").trim();
+  // note 是决策理由（后端 AgentApprovalDecisionCreate.note，≤1000 字符），reject 时必填、approve 时可选
+  const noteText = String(formData.get("note") ?? "").trim();
   const valid =
     Number.isInteger(workspaceId) &&
     workspaceId > 0 &&
@@ -41,7 +43,11 @@ export async function POST(request: Request, context: RouteContext) {
           "Content-Type": "application/json",
           ...(await workspaceAuthHeaders(workspaceId)),
         },
-        body: JSON.stringify({ decision, decision_payload: decisionPayload }),
+        body: JSON.stringify({
+          decision,
+          decision_payload: decisionPayload,
+          ...(noteText ? { note: noteText.slice(0, 1000) } : {}),
+        }),
       },
     );
     succeeded = response.ok;
