@@ -1,17 +1,3 @@
-import {
-  ArrowLeft,
-  ArrowRight,
-  Brain,
-  CheckCircle2,
-  CircleDollarSign,
-  ClipboardList,
-  ExternalLink,
-  ImageIcon,
-  LinkIcon,
-  Megaphone,
-  RefreshCw,
-  Video,
-} from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -38,10 +24,328 @@ import type {
   CompetitorMonitor,
   GeneratedAsset,
   GenerationJob,
+  InventoryMovement,
   PerformanceRecord,
   ProductDetail,
   PromotionLink,
 } from "@/types";
+
+/* ==========================================================================
+   页面样式（对照 designs/product-detail.html 内联 <style> 移植）
+   —— 只消费 design-system.css 的 token 与组件类，不新增视觉值
+   ========================================================================== */
+const productCss = `
+  /* 宽表格 min-width 会经由 grid 项的自动最小尺寸把整页撑宽（375px 会溢出），
+     这里把外壳轨道的最小值钉成 0，让 .tbl-wrap 自己横向滚动。 */
+  .app, .app-body { grid-template-columns: minmax(0, 1fr); }
+  .pane, .wrap { min-width: 0; }
+  .wrap { width: 100%; max-width: var(--max-w); margin-inline: auto; }
+  .stack   { display: flex; flex-direction: column; gap: var(--sp-6); }
+  .stack-5 { display: flex; flex-direction: column; gap: var(--sp-5); }
+  .stack-4 { display: flex; flex-direction: column; gap: var(--sp-4); }
+  .stack-3 { display: flex; flex-direction: column; gap: var(--sp-3); }
+  .stack-2 { display: flex; flex-direction: column; gap: var(--sp-2); }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); }
+  .row-between { justify-content: space-between; }
+  .row-end { align-items: flex-end; }
+  .grow { flex: 1; min-width: 0; }
+  .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-4); }
+  .grid-2-1 { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: var(--sp-4); }
+  .grid-1-2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: var(--sp-4); }
+  .code { font-family: var(--font-mono); font-size: var(--fs-mini); line-height: 1.75; color: var(--fg-secondary);
+          background: var(--surface-sunken); border: 1px solid var(--border); border-radius: var(--radius);
+          padding: var(--sp-3); overflow-x: auto; white-space: pre; }
+  .url { font-family: var(--font-mono); font-size: var(--fs-mini); color: var(--muted); overflow-wrap: anywhere; }
+  .mono-note { font-family: var(--font-mono); font-size: var(--fs-mini); color: var(--faint); }
+  .app-top nav a { min-height: 44px; display: inline-flex; align-items: center; white-space: nowrap; flex: 0 0 auto; }
+  .ic-back { transform: rotate(90deg); }
+  [id] { scroll-margin-top: 130px; }
+
+  /* --- 区块头 -------------------------------------------------------- */
+  .sec { display: flex; flex-direction: column; gap: var(--sp-4); }
+  .sec-hd {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    gap: var(--sp-3) var(--sp-4); flex-wrap: wrap;
+    margin-bottom: var(--sp-1); padding-bottom: var(--sp-3);
+    border-bottom: 1px solid var(--border);
+  }
+  .sec-hd h2 { font-size: var(--fs-h2); }
+  .sec-hd .mono-note { max-width: 62ch; text-align: right; }
+  .sec-hd .stack-2 { min-width: 0; }
+
+  /* --- 粘性页签导航 --------------------------------------------------- */
+  .subnav { border-bottom: 1px solid var(--border); background: var(--bg); }
+  .tabs { display: flex; gap: .25rem; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    flex: 0 0 auto;
+    display: inline-flex; align-items: center; justify-content: center; gap: .4em;
+    min-height: 44px; padding: .5rem .875rem;
+    border: 1px solid transparent; border-bottom: 0;
+    border-radius: var(--radius) var(--radius) 0 0;
+    background: transparent; color: var(--muted);
+    font-family: var(--font-mono); font-size: var(--fs-mini);
+    font-weight: 600; letter-spacing: .06em; white-space: nowrap;
+    transition: color var(--t-2) var(--ease-state), background-color var(--t-2) var(--ease-state);
+  }
+  .tab:hover { color: var(--fg); background: var(--surface-subtle); }
+  .tab[aria-selected="true"] { background: var(--surface); border-color: var(--border); color: var(--fg); margin-bottom: -1px; }
+  .tab .n { color: var(--faint); }
+  .tab[aria-selected="true"] .n { color: var(--accent); }
+
+  /* --- 页头与 KPI ------------------------------------------------------ */
+  .page-hd { display: flex; flex-direction: column; gap: var(--sp-4); }
+  .crumb {
+    display: inline-flex; align-items: center; gap: .4rem; min-height: 44px;
+    font-size: var(--fs-meta); color: var(--muted);
+  }
+  .crumb:hover { color: var(--fg); }
+  .hd-split { display: flex; flex-direction: column; gap: var(--sp-4); }
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-4); }
+  .kpi {
+    min-width: 0; padding: var(--sp-4);
+    border: 1px solid var(--border); border-top-width: 2px; border-radius: var(--radius);
+    background: var(--surface);
+    display: flex; flex-direction: column; gap: .5rem;
+  }
+  .kpi.is-lead { border-top-color: var(--accent); }
+  .kpi-lbl {
+    display: flex; align-items: center; gap: .5rem;
+    font-family: var(--font-mono); font-size: var(--fs-mini); font-weight: 700;
+    letter-spacing: .08em; text-transform: uppercase; color: var(--faint);
+  }
+  .kpi-val { font-family: var(--font-display); font-size: var(--fs-h1); font-weight: 700; line-height: 1.12; }
+  .kpi-val.is-idle { color: var(--muted); }
+  .kpi-desc { color: var(--muted); line-height: 1.7; flex: 1; }
+  .kpi-foot {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: .5rem; flex-wrap: wrap;
+    padding-top: var(--sp-3); border-top: 1px solid var(--border);
+  }
+
+  /* --- 反白 lead 面板（全页唯一最高层级） ------------------------------ */
+  .panel-inverted .lead-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
+  .panel-inverted .lead-main { padding: var(--sp-5); border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: var(--sp-3); }
+  .panel-inverted .lead-side { padding: var(--sp-5); display: flex; flex-direction: column; gap: var(--sp-3); }
+  .panel-inverted h3, .panel-inverted h2 { font-size: var(--fs-h2); }
+  .panel-inverted h2 { color: var(--bg); }
+  .panel-inverted .do { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-3); align-items: center; }
+  .panel-inverted .trace { background: transparent; border-color: color-mix(in oklch, var(--bg) 26%, var(--fg)); margin-bottom: 0; }
+  .panel-inverted .trace-hd {
+    border-bottom-color: color-mix(in oklch, var(--bg) 26%, var(--fg));
+    color: color-mix(in oklch, var(--bg) 74%, var(--fg));
+  }
+  .panel-inverted .trace-step { border-bottom-color: color-mix(in oklch, var(--bg) 18%, var(--fg)); }
+  .panel-inverted .trace-step p { color: color-mix(in oklch, var(--bg) 82%, var(--fg)); }
+  .panel-inverted .trace-time { color: color-mix(in oklch, var(--bg) 66%, var(--fg)); }
+  .panel-inverted .trace-dot { background: color-mix(in oklch, var(--bg) 46%, var(--fg)); }
+  .panel-inverted .trace-dot.done { background: var(--success); }
+  .panel-inverted .trace-dot.run { background: var(--warn); }
+  .panel-inverted .trace-dot.fail { background: var(--accent); }
+  .panel-inverted .btn:not(.btn-primary) {
+    background: transparent;
+    border-color: color-mix(in oklch, var(--bg) 42%, var(--fg));
+    color: var(--bg);
+  }
+  .todo-step { padding: .5rem 0; }
+  .todo-step p { font-size: var(--fs-meta); line-height: 1.7; }
+
+  /* --- 闭环进度轨（7 步 / 5 步共用） ---------------------------------- */
+  .flow {
+    display: grid; gap: 0; border: 1px solid var(--border);
+    border-radius: var(--radius); background: var(--surface); overflow: hidden;
+  }
+  .flow-7 { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .flow-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .flow-step {
+    min-width: 0; padding: var(--sp-3);
+    border-right: 1px solid var(--border);
+    border-top: 2px solid transparent;
+    display: flex; flex-direction: column; gap: .375rem;
+  }
+  .flow-step:last-child { border-right: 0; }
+  .flow-step.is-done { border-top-color: var(--success); }
+  .flow-step.is-next { border-top-color: var(--accent); background: var(--accent-tint); }
+  .flow-step.is-idle h4, .flow-step.is-idle h3 { color: var(--muted); }
+  .flow-step a { display: flex; flex-direction: column; gap: .375rem; min-height: 44px; }
+  .flow-idx { font-family: var(--font-mono); font-size: var(--fs-mini); font-weight: 700; letter-spacing: .1em; color: var(--faint); }
+  .flow-step h4, .flow-step h3 { font-size: var(--fs-body); }
+  .flow-step p { font-family: var(--font-mono); font-size: var(--fs-mini); color: var(--muted); line-height: 1.6; }
+  .flow-mark { display: inline-flex; align-items: center; gap: .375rem; font-family: var(--font-mono); font-size: var(--fs-mini); color: var(--faint); }
+  .flow-step.is-next .flow-mark { color: var(--accent); }
+  .wf-icon {
+    width: 36px; height: 36px; flex: none; display: grid; place-items: center;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--surface-sunken); color: var(--fg-secondary); font-size: 18px;
+  }
+
+  /* --- 语义 tint 块 ---------------------------------------------------- */
+  .tint {
+    border: 1px solid var(--border); border-left: 3px solid var(--border-strong);
+    border-radius: var(--radius); padding: var(--sp-3) var(--sp-4); min-width: 0;
+  }
+  .tint-lbl {
+    display: block; margin-bottom: .375rem;
+    font-family: var(--font-mono); font-size: var(--fs-mini); font-weight: 700;
+    letter-spacing: .06em; text-transform: uppercase; color: var(--faint);
+  }
+  .tint p { color: var(--fg-secondary); }
+  .tint ul { margin: 0; padding: 0; list-style: none; }
+  .tint li { font-size: var(--fs-body); line-height: 1.7; color: var(--fg-secondary); }
+  .tint-ok     { background: var(--success-tint); border-left-color: var(--success); }
+  .tint-warn   { background: var(--warn-tint);    border-left-color: var(--warn); }
+  .tint-info   { background: var(--info-tint);    border-left-color: var(--info); }
+  .tint-accent { background: var(--accent-tint);  border-left-color: var(--accent); }
+  .tint-accent .tint-lbl { color: var(--accent); }
+  .tint-ok .tint-lbl { color: var(--success); }
+  .tint-warn .tint-lbl { color: var(--warn); }
+  .tint-info .tint-lbl { color: var(--info); }
+
+  /* --- 提示条 ---------------------------------------------------------- */
+  .alert {
+    display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: .75rem;
+    align-items: center; min-height: 44px;
+    border: 1px solid var(--border); border-left: 3px solid var(--border-strong);
+    border-radius: var(--radius); background: var(--surface);
+    padding: var(--sp-3) var(--sp-4);
+  }
+  .alert-ok     { background: var(--success-tint); border-left-color: var(--success); }
+  .alert-warn   { background: var(--warn-tint);    border-left-color: var(--warn); }
+  .alert-fail   { background: var(--accent-tint);  border-left-color: var(--accent); }
+  .alert-info   { background: var(--info-tint);    border-left-color: var(--info); }
+  .alert .h { font-weight: 700; }
+  .alert > span { font-size: var(--fs-body); line-height: 1.7; color: var(--fg-secondary); min-width: 0; }
+
+  /* --- 指标小卡 -------------------------------------------------------- */
+  .metrics { display: grid; gap: var(--sp-2); grid-template-columns: repeat(auto-fit, minmax(min(118px, 100%), 1fr)); }
+  .metrics-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .metric {
+    min-width: 0; padding: .5rem .75rem;
+    border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-sunken);
+  }
+  .metric .lbl { display: block; font-family: var(--font-mono); font-size: var(--fs-mini); color: var(--faint); }
+  .metric .val { display: block; margin-top: .125rem; font-family: var(--font-mono); font-weight: 700; font-size: var(--fs-meta); }
+  .metric .val.is-ok { color: var(--success); }
+  .metric .val.is-warn { color: var(--warn); }
+  .metric .val.is-accent { color: var(--accent); }
+  .metric .val.is-idle { color: var(--muted); font-weight: 400; }
+
+  /* --- 生成任务三态 ---------------------------------------------------- */
+  .job {
+    display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0;
+    border: 1px solid var(--border); border-left-width: 3px; border-left-color: var(--border-strong);
+    border-radius: var(--radius); background: var(--surface); padding: var(--sp-3);
+  }
+  .job.is-run  { border-left-color: var(--warn); }
+  .job.is-ok   { border-left-color: var(--success); }
+  .job.is-fail { border-left-color: var(--accent); }
+  .job-hd { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); flex-wrap: wrap; }
+  .job-body { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--sp-3); align-items: start; }
+  .job-id { font-family: var(--font-mono); font-size: var(--fs-mini); color: var(--faint); }
+
+  /* --- 进度条 / 趋势条 -------------------------------------------------- */
+  .bar { height: 8px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-sunken); overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: var(--border-strong); }
+  .bar > .is-run { background: var(--warn); }
+  .bar > .is-ok { background: var(--success); }
+  .bar > .is-accent { background: var(--accent); }
+  .bar > .is-info { background: var(--info); }
+  .trend { display: grid; grid-template-columns: 52px minmax(0, 1fr) 84px; gap: .5rem; align-items: center; }
+  .trend .t-lbl { font-family: var(--font-mono); font-size: var(--fs-mini); color: var(--faint); }
+  .trend .t-val { text-align: right; font-family: var(--font-mono); font-size: var(--fs-mini); font-weight: 700; }
+
+  /* --- 媒体占位 --------------------------------------------------------- */
+  .thumb {
+    aspect-ratio: 1 / 1; width: 100%;
+    display: grid; place-items: center; text-align: center;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--surface-sunken);
+    font-family: var(--font-mono); font-size: var(--fs-mini); color: var(--faint);
+    padding: var(--sp-2);
+  }
+  .thumb-169 { aspect-ratio: 16 / 9; }
+  .thumb-sm { width: 64px; aspect-ratio: 1 / 1; }
+  .asset { display: flex; flex-direction: column; gap: var(--sp-3); }
+  .asset-fig { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface-sunken); }
+
+  /* --- 键值表 / 表单 ---------------------------------------------------- */
+  .kv { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .375rem var(--sp-3); margin: 0; }
+  .kv dt { font-family: var(--font-mono); font-size: var(--fs-mini); color: var(--faint); white-space: nowrap; }
+  .kv dd { margin: 0; color: var(--fg-secondary); min-width: 0; overflow-wrap: anywhere; font-size: var(--fs-body); line-height: 1.7; }
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: var(--sp-3); }
+  .input, select.input, input.input, textarea.input { min-width: 0; }
+  .input { min-height: 44px; }
+  textarea.input { min-height: 44px; }
+  details > summary {
+    display: flex; align-items: center; gap: .5rem; min-height: 44px;
+    cursor: pointer; color: var(--fg-secondary); font-weight: 600;
+  }
+  details > summary:hover { color: var(--fg); }
+  details.boxed {
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--surface-subtle); padding: 0 var(--sp-3) var(--sp-3);
+  }
+  details.boxed[open] { padding-bottom: var(--sp-4); }
+  .lnk { display: inline-flex; align-items: center; gap: .375rem; min-height: 44px; color: var(--info); font-weight: 600; }
+  .lnk:hover { text-decoration: underline; }
+  .chip-row { display: flex; flex-wrap: wrap; gap: .375rem .5rem; }
+
+  /* --- 表格 ------------------------------------------------------------- */
+  .tbl { font-size: var(--fs-body); min-width: 100%; }
+  .tbl-l { min-width: 720px; }
+  .tbl-x { min-width: 980px; }
+  .tbl .num { font-family: var(--font-mono); text-align: right; white-space: nowrap; }
+  .tbl .key { font-family: var(--font-mono); color: var(--faint); white-space: nowrap; }
+  .tbl .wrap-cell { min-width: 14rem; }
+  .tbl .actions { display: flex; flex-wrap: wrap; gap: .375rem; }
+  .cell-goods { display: flex; align-items: center; gap: var(--sp-3); min-width: 14rem; }
+  .cell-goods b { font-weight: 600; }
+  .cell-goods span { display: block; font-family: var(--font-mono); font-size: var(--fs-mini); color: var(--faint); }
+  .tbl-note {
+    display: flex; align-items: flex-start; gap: .5rem;
+    padding: var(--sp-3) var(--sp-4); border-top: 1px solid var(--border);
+    background: var(--surface-subtle);
+    font-family: var(--font-mono); font-size: var(--fs-mini); color: var(--muted); line-height: 1.7;
+  }
+
+  /* --- 空态 -------------------------------------------------------------- */
+  .empty-actions { display: flex; justify-content: center; gap: var(--sp-3); flex-wrap: wrap; margin-top: var(--sp-4); }
+  .empty-next {
+    margin-top: var(--sp-4); padding-top: var(--sp-4); border-top: 1px solid var(--border);
+    font-family: var(--font-mono); font-size: var(--fs-mini); color: var(--muted);
+    display: flex; align-items: center; justify-content: center; gap: .5rem; flex-wrap: wrap;
+    text-align: left;
+  }
+
+  /* --- 响应式 ------------------------------------------------------------ */
+  @media (min-width: 768px) {
+    .subnav { position: sticky; top: 60px; z-index: 30; }
+  }
+  @media (max-width: 1199px) {
+    .metrics-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+  @media (max-width: 1023px) {
+    .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .flow-7, .flow-5 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .flow-step { border-bottom: 1px solid var(--border); }
+    .panel-inverted .lead-grid { grid-template-columns: minmax(0, 1fr); }
+    .panel-inverted .lead-main { border-right: 0; border-bottom: 1px solid var(--border); }
+  }
+  @media (max-width: 899px) {
+    .grid-2, .grid-3, .grid-2-1, .grid-1-2 { grid-template-columns: minmax(0, 1fr); }
+    .sec-hd .mono-note { text-align: left; }
+    .job-body { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 767px) {
+    .app-top .brand .sub { display: none; }
+    .kpi-grid { grid-template-columns: minmax(0, 1fr); }
+    .flow-7, .flow-5 { grid-template-columns: minmax(0, 1fr); }
+    .flow-step { border-right: 0; }
+    .metrics-6 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .thumb-sm { width: 44px; }
+  }
+`;
 
 const platformLabels: Record<string, string> = {
   douyin: "抖音",
@@ -85,6 +389,7 @@ type ProductDetailPageProps = {
     performance?: string;
     sku?: string;
     tab?: string;
+    section?: string;
   }>;
 };
 
@@ -125,9 +430,14 @@ export default async function ProductDetailPage({ params, searchParams }: Produc
   const latestReviewReport = [...product.review_reports].sort((a, b) => b.id - a.id)[0];
   const latestAdRecommendation = [...product.ad_recommendations].sort((a, b) => b.id - a.id)[0];
   const adExperiments = [...product.ad_experiments].sort((a, b) => b.id - a.id).slice(0, 4);
-  const activeTab = resolveProductTab(resolvedSearchParams?.tab);
+  // ?section= 锚点参数与 ?tab= 等价（设计稿以 section 锚点导航，线上系统用 tab 路由切换）
+  const activeTab = resolveProductTab(resolvedSearchParams?.tab ?? resolvedSearchParams?.section);
   const workflowSteps = buildProductWorkflowSteps(product);
   const competitorInsights = buildCompetitorInsights(product.competitors, product.price);
+  // InventoryMovement 挂在每个 SKU 上，这里跨 SKU 聚合后按时间倒序展示最近流水
+  const inventoryMovements = (product.skus ?? [])
+    .flatMap((sku) => sku.inventory_movements ?? [])
+    .sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : b.id - a.id));
   const assetLibrary = collectAssetLibrary(product.generated_assets, product.creative_plans);
   const hasActiveGenerationJobs = product.generation_jobs.some((job) =>
     ["pending", "running"].includes(job.status),
@@ -135,1223 +445,1620 @@ export default async function ProductDetailPage({ params, searchParams }: Produc
   const currentUser = token ? await getCurrentUser(token) : null;
   // canEdit 只控制前端写操作入口展示；真实鉴权仍由后端 API 权限依赖兜底。
   const canEdit = Boolean(currentUser?.permissions.can_edit);
+  const doneStepCount = workflowSteps.filter((step) => step.done).length;
+  const nextStep = workflowSteps.find((step) => !step.done) ?? workflowSteps[workflowSteps.length - 1];
+  const recentJobs = product.generation_jobs.slice(0, 5);
+  const blockedJobs = recentJobs.filter((job) => job.status === "failed");
+  const runningJobCount = recentJobs.filter((job) => ["pending", "running"].includes(job.status)).length;
+  const missingLinkCompetitors = product.competitors.filter((competitor) => !competitor.url).length;
+  const imageAssetCount = assetLibrary.filter((asset) => asset.kind === "image").length;
+  const videoAssetCount = assetLibrary.filter((asset) => asset.kind === "video").length;
+  const assetStatusCounts = countAssetStatuses(assetLibrary);
 
   return (
-    <main className="min-h-screen bg-[#f4f6fb] px-5 py-6 text-slate-950 lg:px-8">
-      <GenerationJobAutoRefresh active={hasActiveGenerationJobs} />
-      <div className="mx-auto flex max-w-7xl flex-col gap-6">
-        <header className="flex flex-col gap-4 border-b border-slate-200 pb-5">
-          <Link href="/" className="inline-flex w-fit items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-950">
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            返回商品池
-          </Link>
+    <div className="app">
+      <style dangerouslySetInnerHTML={{ __html: productCss }} />
 
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-sm font-medium text-emerald-700">
-                {platformLabels[product.platform]} · {product.category ?? "未分类"}
-              </p>
-              <h1 className="mt-2 text-2xl font-semibold tracking-normal text-slate-950 sm:text-3xl">
-                {product.name}
-              </h1>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {product.selling_points.length === 0 ? (
-                  <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs text-slate-500">
-                    暂无卖点
-                  </span>
-                ) : (
-                  product.selling_points.map((point) => (
-                    <span key={point} className="rounded-md bg-emerald-50 px-2.5 py-1 text-xs text-emerald-700">
-                      {point}
-                    </span>
-                  ))
-                )}
-              </div>
-            </div>
+      <ProductTopBar />
 
-            <div className="grid grid-cols-3 gap-3 sm:w-[480px]">
-              <div className="rounded-md border border-slate-200 bg-white px-4 py-3">
-                <p className="text-xs text-slate-500">售价</p>
-                <p className="mt-1 text-xl font-semibold">{product.price ? `¥${product.price}` : "-"}</p>
-              </div>
-              <div className="rounded-md border border-slate-200 bg-white px-4 py-3">
-                <p className="text-xs text-slate-500">竞品</p>
-                <p className="mt-1 text-xl font-semibold">{product.competitors.length}</p>
-              </div>
-              <div className="rounded-md border border-slate-200 bg-white px-4 py-3">
-                <p className="text-xs text-slate-500">素材</p>
-                <p className="mt-1 text-xl font-semibold">{product.creative_plans.length}</p>
-              </div>
-            </div>
-          </div>
-        </header>
+      <main className="app-body">
+        <div className="pane">
+          <div className="wrap">
+            <div className="stack">
+              <GenerationJobAutoRefresh active={hasActiveGenerationJobs} />
 
-        <ProductTabNav productId={product.id} activeTab={activeTab} />
-        <ProductWorkflowPanel steps={workflowSteps} />
-        {!canEdit ? (
-          <section className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            当前账号为只读权限，生成、保存、取消、重试和导入等写操作按钮已隐藏。
-          </section>
-        ) : null}
-        <GenerationJobSummary
-          activeTab={activeTab}
-          canEdit={canEdit}
-          jobs={product.generation_jobs.slice(0, 5)}
-          productId={product.id}
-        />
+              {/* 页头：这个单品是谁 */}
+              <header className="page-hd">
+                <Link className="crumb" href="/">
+                  <svg className="ic ic-sm ic-back" aria-hidden="true"><use href="#i-chev"></use></svg>
+                  返回商品池
+                </Link>
 
-        {activeTab === "agent" ? (
-          <AgentRunPanel productId={product.id} initialRuns={agentRuns} canEdit={canEdit} />
-        ) : null}
-
-        {activeTab === "overview" ? (
-        <section className="grid gap-6 lg:grid-cols-[420px_1fr]">
-          <div className="grid gap-6">
-            <div className="rounded-md border border-slate-200 bg-white p-6">
-              <ProductEditForm product={product} canEdit={canEdit} />
-            </div>
-            <div className="rounded-md border border-slate-200 bg-white p-6">
-              <SkuCreateForm productId={product.id} canEdit={canEdit} />
-            </div>
-            <div className="rounded-md border border-slate-200 bg-white p-6">
-              <CompetitorUrlImportForm productId={product.id} canEdit={canEdit} />
-            </div>
-            <div className="rounded-md border border-slate-200 bg-white p-6">
-              <CompetitorCreateForm productId={product.id} canEdit={canEdit} />
-            </div>
-          </div>
-
-          <div className="grid gap-6">
-            <SkuInventoryPanel
-              productId={product.id}
-              skus={product.skus ?? []}
-              skuStatus={resolvedSearchParams?.sku}
-              inventoryStatus={resolvedSearchParams?.inventory}
-              canEdit={canEdit}
-            />
-            <PlatformMappingPanel
-              productId={product.id}
-              productPlatform={product.platform}
-              productStoreId={product.store_id}
-              stores={stores}
-              skus={product.skus ?? []}
-              mappings={product.platform_mappings ?? []}
-              mappingStatus={resolvedSearchParams?.mapping}
-              canEdit={canEdit}
-            />
-            <div className="rounded-md border border-slate-200 bg-white p-6">
-            <CompetitorImportAlert
-              competitorStatus={resolvedSearchParams?.competitor}
-              importStatus={resolvedSearchParams?.competitor_import}
-            />
-            <CompetitorInsightsPanel insights={competitorInsights} />
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-semibold">竞品列表</h2>
-                <p className="mt-1 text-sm text-slate-500">先把市场参照物摆上桌面，后续分析才有抓手</p>
-              </div>
-              <span className="rounded-md bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-                {priceSpread.length > 0
-                  ? `价格样本 ${Math.min(...priceSpread)}-${Math.max(...priceSpread)}`
-                  : "待补充价格"}
-              </span>
-            </div>
-
-            <div className="mt-5 overflow-hidden rounded-md border border-slate-200">
-              <div className="grid grid-cols-[1.2fr_0.7fr_0.6fr_1.1fr_1fr] bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500">
-                <span>竞品</span>
-                <span>平台</span>
-                <span>售价</span>
-                <span>标题</span>
-                <span>卖点</span>
-              </div>
-
-              {product.competitors.length === 0 ? (
-                <div className="px-4 py-12 text-center text-sm text-slate-500">
-                  还没有竞品。建议先录入 3 个同价位或同类目爆款。
-                </div>
-              ) : (
-                <div className="divide-y divide-slate-200">
-                  {product.competitors.map((competitor) => (
-                    <div
-                      key={competitor.id}
-                      className="grid min-h-16 grid-cols-[1.2fr_0.7fr_0.6fr_1.1fr_1fr] items-center px-4 py-3 text-sm"
-                    >
-                      <div>
-                        <p className="font-medium text-slate-950">{competitor.name}</p>
-                        {competitor.url ? (
-                          <a
-                            href={competitor.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="mt-1 inline-flex items-center gap-1 text-xs text-sky-700 hover:text-sky-900"
-                          >
-                            <LinkIcon className="h-3 w-3" aria-hidden="true" />
-                            查看链接
-                          </a>
+                <div className="hd-split">
+                  <div className="row row-between row-end">
+                    <div className="stack-3">
+                      <span className="eyebrow">
+                        {platformLabels[product.platform]} · {product.category ?? "未分类"} · 店铺 #{product.store_id}
+                      </span>
+                      <h1 className="t-h1">{product.name}</h1>
+                      <div className="chip-row">
+                        {product.selling_points.length === 0 ? (
+                          <span className="tag">暂无卖点</span>
                         ) : (
-                          <p className="mt-1 text-xs text-slate-400">未填链接</p>
+                          product.selling_points.map((point) => (
+                            <span key={point} className="tag">{point}</span>
+                          ))
                         )}
                       </div>
-                      <span className="text-slate-600">{platformLabels[competitor.platform]}</span>
-                      <span className="font-medium text-slate-800">
-                        {competitor.price ? `¥${competitor.price}` : "-"}
-                      </span>
-                      <span className="line-clamp-2 text-slate-600">{competitor.title ?? "-"}</span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {competitor.selling_points.slice(0, 3).map((point) => (
-                          <span key={point} className="rounded-md bg-sky-50 px-2 py-1 text-xs text-sky-700">
-                            {point}
-                          </span>
-                        ))}
+                      <div className="row">
+                        <span className="mono-note">商品 #{product.id}</span>
+                        <span className="mono-note">外部 ID {product.external_product_id ?? "—"}</span>
+                        <span className="mono-note">资料更新 {formatDateTime(product.updated_at)}</span>
+                        <span className="mono-note">
+                          {product.skus.length} SKU · {product.competitors.length} 竞品 · {assetLibrary.length} 素材
+                        </span>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <CompetitorMonitorPanel
-              competitors={product.competitors}
-              monitors={product.competitor_monitors ?? []}
-              productId={product.id}
-              canEdit={canEdit}
-            />
-            </div>
-          </div>
-        </section>
-        ) : null}
-
-        {activeTab === "diagnosis" ? (
-        <section className="grid gap-6 lg:grid-cols-[1fr_360px]">
-          <div className="rounded-md border border-slate-200 bg-white p-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold">商品诊断</h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  基于商品信息和竞品样本生成定位、价格带、痛点和动作建议
-                </p>
-              </div>
-              {canEdit ? (
-                <form action={`/products/${product.id}/diagnoses/generate`} method="post">
-                  <button
-                    type="submit"
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800"
-                  >
-                    <Brain className="h-4 w-4" aria-hidden="true" />
-                    生成诊断
-                  </button>
-                </form>
-              ) : null}
-            </div>
-
-            {latestDiagnosis ? (
-              <div className="mt-5 grid gap-4">
-                <div className="rounded-md border border-emerald-100 bg-emerald-50 p-4">
-                  <p className="text-xs font-medium text-emerald-700">定位判断</p>
-                  <p className="mt-2 text-sm leading-6 text-slate-800">{latestDiagnosis.positioning}</p>
-                </div>
-
-                <div className="rounded-md border border-slate-200 p-4">
-                  <p className="text-xs font-medium text-slate-500">价格带判断</p>
-                  <p className="mt-2 text-sm leading-6 text-slate-800">{latestDiagnosis.price_band}</p>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <DiagnosisList title="用户痛点" items={latestDiagnosis.pain_points} />
-                  <DiagnosisList title="卖点判断" items={latestDiagnosis.selling_point_analysis} />
-                  <DiagnosisList title="风险点" items={latestDiagnosis.risks} />
-                  <DiagnosisList title="下一步建议" items={latestDiagnosis.recommendations} accent />
-                </div>
-
-                {canEdit ? (
-                  <details className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-                    <summary className="cursor-pointer text-sm font-medium text-slate-700">
-                      编辑诊断
-                    </summary>
-                    <DiagnosisEditForm productId={product.id} diagnosis={latestDiagnosis} />
-                  </details>
-                ) : null}
-              </div>
-            ) : (
-              <div className="mt-5 rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">
-                还没有诊断报告。建议补充至少 1-3 个竞品后生成第一版诊断。
-              </div>
-            )}
-          </div>
-
-          <div className="grid gap-4">
-          <div className="rounded-md border border-slate-200 bg-white p-4">
-            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-emerald-100 text-emerald-700">
-              <ImageIcon className="h-4 w-4" aria-hidden="true" />
-            </div>
-            <h3 className="mt-4 text-sm font-semibold text-slate-950">主图方案</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-500">
-              根据诊断结果生成可交给设计执行的画面方向
-            </p>
-            {canEdit ? (
-              <form action={`/products/${product.id}/creative-plans/main-images/generate`} method="post">
-                <button
-                  type="submit"
-                  className="mt-4 inline-flex h-9 w-full items-center justify-center gap-2 rounded-md bg-slate-950 px-3 text-xs font-semibold text-white transition hover:bg-slate-800"
-                >
-                  <ImageIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                  生成主图
-                </button>
-              </form>
-            ) : null}
-          </div>
-          <div className="rounded-md border border-slate-200 bg-white p-4">
-            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-violet-100 text-violet-700">
-              <Video className="h-4 w-4" aria-hidden="true" />
-            </div>
-            <h3 className="mt-4 text-sm font-semibold text-slate-950">短视频脚本</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-500">
-              生成开头钩子、镜头分镜、口播和转化引导
-            </p>
-            {canEdit ? (
-              <form action={`/products/${product.id}/creative-plans/video-scripts/generate`} method="post">
-                <button
-                  type="submit"
-                  className="mt-4 inline-flex h-9 w-full items-center justify-center gap-2 rounded-md bg-slate-950 px-3 text-xs font-semibold text-white transition hover:bg-slate-800"
-                >
-                  <Video className="h-3.5 w-3.5" aria-hidden="true" />
-                  生成脚本
-                </button>
-              </form>
-            ) : null}
-          </div>
-          <StageCard
-            icon={Megaphone}
-            title="投放复盘"
-            detail="录入曝光、点击、转化、ROI 后判断下一步动作"
-          />
-          </div>
-        </section>
-        ) : null}
-
-        {activeTab === "review" ? (
-        <section className="grid gap-6 lg:grid-cols-[420px_1fr]">
-          <div className="grid gap-6">
-            <div className="rounded-md border border-slate-200 bg-white p-6">
-              <PerformanceRecordForm
-                productId={product.id}
-                creativePlans={product.creative_plans}
-                generatedAssets={product.generated_assets}
-                promotionLinks={product.promotion_links}
-                adExperiments={product.ad_experiments}
-                canEdit={canEdit}
-              />
-            </div>
-            <div className="rounded-md border border-slate-200 bg-white p-6">
-              <PerformanceImportForm productId={product.id} canEdit={canEdit} />
-            </div>
-          </div>
-
-          <div className="rounded-md border border-slate-200 bg-white p-6">
-            <PerformanceImportAlert
-              count={resolvedSearchParams?.count}
-              importStatus={resolvedSearchParams?.import}
-              performanceStatus={resolvedSearchParams?.performance}
-            />
-            <PerformanceSummaryCards summary={performanceSummary} />
-            <PerformanceTrendPanel records={product.performance_records} />
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold">投放复盘</h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  录入经营数据后生成周期复盘，判断下一步换图、调价还是调人群
-                </p>
-              </div>
-              {canEdit ? (
-                <form action={`/products/${product.id}/review-reports/generate`} method="post">
-                <button
-                  type="submit"
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800"
-                >
-                  <Megaphone className="h-4 w-4" aria-hidden="true" />
-                  生成复盘
-                </button>
-                </form>
-              ) : null}
-            </div>
-
-            {latestReviewReport ? (
-              <div className="mt-5 grid gap-4">
-                <div className="rounded-md border border-amber-100 bg-amber-50 p-4">
-                  <p className="text-xs font-medium text-amber-700">
-                    {latestReviewReport.period_start} 至 {latestReviewReport.period_end}
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-slate-800">{latestReviewReport.summary}</p>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <ReviewList title="复盘洞察" items={latestReviewReport.insights} />
-                  <ReviewList title="下一步动作" items={latestReviewReport.next_actions} accent />
-                </div>
-
-                {canEdit ? (
-                  <details className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-                  <summary className="cursor-pointer text-sm font-medium text-slate-700">
-                    编辑复盘
-                  </summary>
-                    <ReviewReportEditForm productId={product.id} report={latestReviewReport} />
-                  </details>
-                ) : null}
-              </div>
-            ) : (
-              <div className="mt-5 rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                暂无复盘报告。先录入一条经营数据，再生成复盘。
-              </div>
-            )}
-
-            <div className="mt-6 overflow-hidden rounded-md border border-slate-200">
-              <div className="grid grid-cols-[1fr_0.9fr_0.8fr_0.8fr_0.55fr_0.55fr_0.55fr_0.55fr] bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500">
-                <span>周期</span>
-                <span>实验</span>
-                <span>素材</span>
-                <span>链接</span>
-                <span>CTR</span>
-                <span>转化率</span>
-                <span>花费</span>
-                <span>ROI</span>
-              </div>
-
-              {performanceRecords.length === 0 ? (
-                <div className="px-4 py-8 text-center text-sm text-slate-500">
-                  还没有经营数据。录入后这里会展示最近 5 条记录。
-                </div>
-              ) : (
-                <div className="divide-y divide-slate-200">
-                  {performanceRecords.map((record) => (
-                    <div
-                      key={record.id}
-                      className="grid min-h-14 grid-cols-[1fr_0.9fr_0.8fr_0.8fr_0.55fr_0.55fr_0.55fr_0.55fr] items-center px-4 py-3 text-sm"
-                    >
-                      <span className="text-slate-700">
-                        {record.period_start} 至 {record.period_end}
-                      </span>
-                      <span className="line-clamp-1 text-slate-600">
-                        {adExperimentTitle(product.ad_experiments, record.ad_experiment_id)}
-                      </span>
-                      <span className="line-clamp-1 text-slate-600">
-                        {creativePlanTitle(product.creative_plans, record.creative_plan_id)}
-                      </span>
-                      <span className="line-clamp-1 text-slate-600">
-                        {promotionLinkTitle(product.promotion_links, record.promotion_link_id)}
-                      </span>
-                      <span className="font-medium text-slate-800">{formatPercent(record.ctr)}</span>
-                      <span className="font-medium text-slate-800">
-                        {formatPercent(record.conversion_rate)}
-                      </span>
-                      <span className="text-slate-700">{formatMoney(record.spend)}</span>
-                      <span className="font-semibold text-slate-950">{formatDecimal(record.roi)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-        ) : null}
-
-        {activeTab === "links" ? (
-        <section className="grid gap-6 lg:grid-cols-[420px_1fr]">
-          <div className="grid gap-6">
-            <div className="rounded-md border border-slate-200 bg-white p-6">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-md bg-emerald-600 text-white">
-                  <LinkIcon className="h-4 w-4" aria-hidden="true" />
-                </div>
-                <div>
-                  <h2 className="text-base font-semibold text-slate-950">生成推荐链接</h2>
-                  <p className="text-sm text-slate-500">按商品承接页、短视频投放和主图测试生成链接</p>
-                </div>
-              </div>
-              {canEdit ? (
-                <form action={`/products/${product.id}/promotion-links/generate`} method="post" className="mt-4">
-                <button
-                  type="submit"
-                  className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800"
-                >
-                  <LinkIcon className="h-4 w-4" aria-hidden="true" />
-                  生成链接
-                </button>
-                </form>
-              ) : null}
-            </div>
-
-            <div className="rounded-md border border-slate-200 bg-white p-6">
-              <PromotionLinkCreateForm productId={product.id} canEdit={canEdit} />
-            </div>
-          </div>
-
-          <div className="rounded-md border border-slate-200 bg-white p-6">
-            <PromotionLinkAlert status={resolvedSearchParams?.links} />
-            <PromotionLinkAttributionPanel
-              links={product.promotion_links}
-              records={product.performance_records}
-            />
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold">推荐链接库</h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  管理商品承接、短视频投放、主图测试和私域转发链接
-                </p>
-              </div>
-              <span className="rounded-md bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-                {product.promotion_links.length} 个链接
-              </span>
-            </div>
-
-            {product.promotion_links.length > 0 ? (
-              <div className="mt-5 grid gap-3">
-                {product.promotion_links.map((link) => (
-                  <PromotionLinkCard key={link.id} link={link} />
-                ))}
-              </div>
-            ) : (
-              <div className="mt-5 rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">
-                还没有推荐链接。可以先生成一组系统链接，或手动添加平台推广链接。
-              </div>
-            )}
-          </div>
-        </section>
-        ) : null}
-
-        {activeTab === "ads" ? (
-        <section className="rounded-md border border-slate-200 bg-white p-6">
-          <AdWorkflowPanel product={product} />
-          <AdLinkRecommendationPanel
-            links={product.promotion_links}
-            records={product.performance_records}
-          />
-          <AdAssetRecommendationPanel
-            assets={product.generated_assets}
-            records={product.performance_records}
-          />
-          <AdExperimentDashboardPanel
-            dashboard={adExperimentDashboard}
-            assets={product.generated_assets}
-            links={product.promotion_links}
-          />
-          <AdExperimentPanel
-            experiments={adExperiments}
-            assets={product.generated_assets}
-            links={product.promotion_links}
-            productId={product.id}
-            status={resolvedSearchParams?.experiment}
-            canEdit={canEdit}
-          />
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold">投放建议</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                基于诊断、素材方向和经营数据，生成下一轮人群、预算、素材测试和风控建议
-              </p>
-            </div>
-            {canEdit ? (
-              <form action={`/products/${product.id}/ad-recommendations/generate`} method="post">
-              <button
-                type="submit"
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800"
-              >
-                <Megaphone className="h-4 w-4" aria-hidden="true" />
-                生成投放建议
-              </button>
-              </form>
-            ) : null}
-          </div>
-
-          {latestAdRecommendation ? (
-            <div className="mt-5 grid gap-4">
-              <div className="rounded-md border border-emerald-100 bg-emerald-50 p-4">
-                <p className="text-xs font-medium text-emerald-700">
-                  {latestAdRecommendation.source === "llm" ? "LLM 生成" : "规则生成"}
-                </p>
-                <p className="mt-2 text-sm leading-6 text-slate-800">{latestAdRecommendation.summary}</p>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <span
-                    className={`${adRecommendationConfirmationTone(latestAdRecommendation.confirmation_status)} rounded-md px-2 py-1 text-xs font-medium`}
-                  >
-                    {adRecommendationConfirmationLabel(latestAdRecommendation.confirmation_status)}
-                  </span>
-                  {latestAdRecommendation.confirmed_at ? (
-                    <span className="rounded-md bg-white px-2 py-1 text-xs text-slate-500">
-                      {formatDateTime(latestAdRecommendation.confirmed_at)}
-                    </span>
-                  ) : null}
-                </div>
-                {latestAdRecommendation.confirmation_note ? (
-                  <p className="mt-2 text-xs leading-5 text-slate-600">{latestAdRecommendation.confirmation_note}</p>
-                ) : null}
-              </div>
-              <PlanField label="本轮目标" value={contentText(latestAdRecommendation.content, "objective")} highlight />
-              <div className="grid gap-4 lg:grid-cols-2">
-                <AdObjectList title="人群建议" items={contentObjects(latestAdRecommendation.content, "audience_segments")} />
-                <BudgetPlan content={latestAdRecommendation.content} />
-                <AdObjectList title="素材测试" items={contentObjects(latestAdRecommendation.content, "creative_tests")} />
-                <AdTextList title="出价策略" items={contentList(latestAdRecommendation.content, "bid_strategy")} />
-                <AdTextList title="风险控制" items={contentList(latestAdRecommendation.content, "risk_controls")} />
-                <AdTextList title="下一步动作" items={contentList(latestAdRecommendation.content, "next_steps")} accent />
-              </div>
-              {canEdit ? (
-                <details className="rounded-md border border-slate-200 bg-white px-4 py-3">
-                <summary className="cursor-pointer text-sm font-medium text-slate-700">人工确认建议</summary>
-                <form
-                  action={`/products/${product.id}/ad-recommendations/${latestAdRecommendation.id}/confirmation`}
-                  method="post"
-                  className="mt-3 grid gap-3"
-                >
-                  <label className="grid gap-1.5">
-                    <span className="text-xs font-medium text-slate-500">确认备注</span>
-                    <textarea
-                      name="confirmation_note"
-                      defaultValue={latestAdRecommendation.confirmation_note ?? ""}
-                      rows={2}
-                      className="resize-y rounded-md border border-slate-200 px-2 py-2 text-sm leading-5 outline-none focus:border-slate-400"
-                      placeholder="记录确认人判断、预算边界或暂不执行原因"
-                    />
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="submit"
-                      name="confirmation_status"
-                      value="confirmed"
-                      className="h-9 rounded-md bg-slate-950 px-3 text-xs font-semibold text-white hover:bg-slate-800"
-                    >
-                      确认建议
-                    </button>
-                    <button
-                      type="submit"
-                      name="confirmation_status"
-                      value="rejected"
-                      className="h-9 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                    >
-                      暂不采纳
-                    </button>
                   </div>
-                </form>
-                </details>
-              ) : null}
-            </div>
-          ) : (
-            <div className="mt-5 rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">
-              还没有投放建议。建议先生成诊断、主图/视频方案，并录入至少一条经营数据。
-            </div>
-          )}
-        </section>
-        ) : null}
+                </div>
+              </header>
 
-        {activeTab === "assets" ? (
-        <section className="rounded-md border border-slate-200 bg-white p-6">
-            <AssetsSyncAlert status={resolvedSearchParams?.assets} />
-            <AssetAttributionPanel
-              assets={product.generated_assets}
-              records={product.performance_records}
-            />
-            <AssetScaleRecommendationPanel
-              assets={product.generated_assets}
-              records={product.performance_records}
-            />
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold">素材资产库</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                汇总当前商品已生成的主图和视频草稿，后续可扩展评分、标签、下载和投放引用
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {canEdit ? (
-                <form action={`/products/${product.id}/assets/sync`} method="post">
-                <button
-                  type="submit"
-                  className="h-8 rounded-md border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  同步历史素材
-                </button>
-                </form>
-              ) : null}
-              <span className="rounded-md bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-                {assetLibrary.length} 个素材
-              </span>
-            </div>
-          </div>
-
-          {assetLibrary.length > 0 ? (
-            <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {assetLibrary.map((asset) => (
-                <div key={asset.url} className="overflow-hidden rounded-md border border-slate-200 bg-slate-50">
-                  {asset.kind === "image" ? (
-                    <a href={absoluteMediaUrl(asset.url)} target="_blank" rel="noreferrer">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={absoluteMediaUrl(asset.url)}
-                        alt={asset.title}
-                        className="aspect-square w-full object-cover"
-                      />
-                    </a>
-                  ) : (
-                    <video
-                      src={absoluteMediaUrl(asset.url)}
-                      controls
-                      className="aspect-video w-full bg-black object-contain"
-                    />
-                  )}
-                  <div className="space-y-2 px-3 py-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-semibold text-slate-950">{asset.title}</p>
-                      <span className="rounded-md bg-white px-2 py-1 text-xs text-slate-600">
-                        {asset.kind === "image" ? "主图" : "视频"}
-                      </span>
-                      <span className="rounded-md bg-white px-2 py-1 text-xs text-slate-600">
-                        V{asset.assetVersion}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-500">
-                      {asset.model || "model"} · {asset.size || "size"}
-                      {asset.duration ? ` · ${asset.duration}s` : ""}
+              {/* 反白 lead 面板：现在什么状态、下一步干什么、有什么要人工处理 */}
+              <section className="panel panel-inverted" aria-labelledby="h-lead">
+                <div className="lead-grid">
+                  <div className="lead-main">
+                    <span className="eyebrow">CURRENT STATE · 单品闭环 {doneStepCount} / {workflowSteps.length}</span>
+                    <h2 id="h-lead">
+                      {nextStep.done ? "闭环已跑通：回到复盘把结论固化下来" : `下一步 · ${nextStep.title}`}
+                    </h2>
+                    <p>
+                      {nextStep.done
+                        ? "建档、竞品、诊断、素材、投放、数据与复盘七个环节均已完成。最近一次复盘结论在复盘页签，可继续据此迭代下一轮动作。"
+                        : `${nextStep.hint}。完成后这一步会标记为已完成，再进入下一个环节。`}
+                      {runningJobCount > 0 ? ` 当前有 ${runningJobCount} 个生成任务在后台执行，页面会自动刷新状态。` : ""}
                     </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {asset.status ? (
-                        <span className={`${assetStatusTone(asset.status)} rounded-md px-2 py-1 text-xs`}>
-                          {asset.status}
-                        </span>
-                      ) : null}
-                      {asset.rating ? (
-                        <span className="rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-700">
-                          {asset.rating} 分
-                        </span>
-                      ) : null}
-                      {asset.tags.map((tag) => (
-                        <span key={tag} className="rounded-md bg-white px-2 py-1 text-xs text-slate-600">
-                          {tag}
-                        </span>
-                      ))}
-                      {asset.usageContexts.map((context) => (
-                        <span key={context} className="rounded-md bg-sky-50 px-2 py-1 text-xs text-sky-700">
-                          {context}
-                        </span>
-                      ))}
-                    </div>
-                    {asset.note ? <p className="text-xs leading-5 text-slate-500">{asset.note}</p> : null}
-                    <a
-                      href={absoluteMediaUrl(asset.url)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                    >
-                      打开素材
-                    </a>
-                    <details className="rounded-md border border-slate-200 bg-white px-3 py-2">
-                      <summary className="cursor-pointer text-xs font-medium text-slate-700">评价素材</summary>
-                      {canEdit ? (
-                        <form
-                        action={`/products/${product.id}/creative-plans/${asset.planId}/assets/update`}
-                        method="post"
-                        className="mt-3 grid gap-3"
-                      >
-                        <input type="hidden" name="url" value={asset.url} />
-                        <input type="hidden" name="asset_type" value={asset.kind} />
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <label className="grid gap-1.5">
-                            <span className="text-xs font-medium text-slate-500">评分</span>
-                            <input
-                              name="rating"
-                              type="number"
-                              min="1"
-                              max="5"
-                              defaultValue={asset.rating ?? ""}
-                              className="h-9 rounded-md border border-slate-200 px-2 text-sm outline-none focus:border-slate-400"
-                            />
-                          </label>
-                          <label className="grid gap-1.5">
-                            <span className="text-xs font-medium text-slate-500">状态</span>
-                            <select
-                              name="status"
-                              defaultValue={asset.status || "待评估"}
-                              className="h-9 rounded-md border border-slate-200 px-2 text-sm outline-none focus:border-slate-400"
-                            >
-                              <option value="待评估">待评估</option>
-                              <option value="通过">通过</option>
-                              <option value="弃用">弃用</option>
-                              <option value="复测">复测</option>
-                            </select>
-                          </label>
-                        </div>
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <label className="grid gap-1.5">
-                            <span className="text-xs font-medium text-slate-500">素材版本</span>
-                            <input
-                              name="asset_version"
-                              type="number"
-                              min="1"
-                              defaultValue={asset.assetVersion}
-                              className="h-9 rounded-md border border-slate-200 px-2 text-sm outline-none focus:border-slate-400"
-                            />
-                          </label>
-                          <label className="grid gap-1.5">
-                            <span className="text-xs font-medium text-slate-500">使用场景</span>
-                            <input
-                              name="usage_contexts"
-                              defaultValue={asset.usageContexts.join("，")}
-                              className="h-9 rounded-md border border-slate-200 px-2 text-sm outline-none focus:border-slate-400"
-                              placeholder="冷启动，人群测试，复测"
-                            />
-                          </label>
-                        </div>
-                        <label className="grid gap-1.5">
-                          <span className="text-xs font-medium text-slate-500">标签</span>
-                          <input
-                            name="tags"
-                            defaultValue={asset.tags.join("，")}
-                            className="h-9 rounded-md border border-slate-200 px-2 text-sm outline-none focus:border-slate-400"
-                            placeholder="通勤，控油，高点击潜力"
-                          />
-                        </label>
-                        <label className="grid gap-1.5">
-                          <span className="text-xs font-medium text-slate-500">备注</span>
-                          <textarea
-                            name="note"
-                            defaultValue={asset.note}
-                            rows={2}
-                            className="resize-y rounded-md border border-slate-200 px-2 py-2 text-sm leading-5 outline-none focus:border-slate-400"
-                            placeholder="记录适合投放的人群、需要优化的问题或复盘观察"
-                          />
-                        </label>
-                        <button
-                          type="submit"
-                          className="h-9 w-fit rounded-md bg-slate-950 px-3 text-xs font-semibold text-white hover:bg-slate-800"
-                        >
-                          保存评价
-                        </button>
-                        </form>
-                      ) : null}
-                    </details>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="mt-5 rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">
-              还没有生成素材。可以先到主图或视频 Tab 生成第一批草稿。
-            </div>
-          )}
-        </section>
-        ) : null}
-
-        {activeTab === "jobs" ? (
-        <section className="rounded-md border border-slate-200 bg-white p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold">生成任务中心</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                查看当前商品所有图片和视频生成任务，包括状态、结果、错误和重试入口
-              </p>
-            </div>
-            <span className="rounded-md bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-              {product.generation_jobs.length + product.public_link_parse_tasks.length} 个任务
-            </span>
-          </div>
-
-          {product.generation_jobs.length > 0 ? (
-            <div className="mt-5 overflow-hidden rounded-md border border-slate-200">
-              <div className="grid grid-cols-[80px_90px_110px_1fr_170px] bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
-                <span>ID</span>
-                <span>类型</span>
-                <span>状态</span>
-                <span>结果 / 错误</span>
-                <span>操作</span>
-              </div>
-              <div className="divide-y divide-slate-200">
-                {product.generation_jobs.map((job) => (
-                  <div
-                    key={job.id}
-                    className="grid grid-cols-[80px_90px_110px_1fr_170px] items-center gap-3 px-3 py-3 text-sm"
-                  >
-                    <span className="font-medium text-slate-700">#{job.id}</span>
-                    <span className="text-slate-600">{job.kind === "video_asset" ? "视频" : "图片"}</span>
-                    <JobStatusBadge job={job} />
-                    <div className="min-w-0">
-                      {job.status === "succeeded" && jobResultUrl(job) ? (
-                        <a
-                          href={absoluteMediaUrl(jobResultUrl(job) || "")}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-sky-700 hover:text-sky-900"
-                        >
-                          打开生成结果
-                        </a>
-                      ) : job.error ? (
-                        <p className="line-clamp-2 text-xs leading-5 text-rose-700">{job.error}</p>
-                      ) : (
-                        <p className="text-xs text-slate-500">
-                          {job.started_at ? `开始于 ${job.started_at}` : "等待后台执行"}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Link
-                        href={`/products/${product.id}/generation-jobs/${job.id}`}
-                        className="inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                      >
-                        详情
+                    <div className="do">
+                      <span className="badge badge-accent">下一步 · STEP {String(workflowSteps.indexOf(nextStep) + 1).padStart(2, "0")} {nextStep.title}</span>
+                      <Link className="btn btn-primary" href={nextStep.href}>
+                        <svg className="ic ic-sm" aria-hidden="true"><use href="#i-arrow-r"></use></svg>
+                        {nextStep.done ? "查看复盘" : "继续处理"}
                       </Link>
-                      {canEdit && job.status === "failed" ? (
-                        <form action={`/products/${product.id}/generation-jobs/${job.id}/retry`} method="post">
-                          <input type="hidden" name="tab" value="jobs" />
-                          <button
-                            type="submit"
-                            className="h-8 rounded-md bg-slate-950 px-3 text-xs font-medium text-white hover:bg-slate-800"
-                          >
-                            重试
-                          </button>
-                        </form>
-                      ) : canEdit && (job.status === "pending" || job.status === "running") ? (
-                        <form action={`/products/${product.id}/generation-jobs/${job.id}/cancel`} method="post">
-                          <input type="hidden" name="tab" value="jobs" />
-                          <button
-                            type="submit"
-                            className="h-8 rounded-md border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                          >
-                            取消
-                          </button>
-                        </form>
-                      ) : (
-                        <span className="text-xs text-slate-400">-</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="mt-5 rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">
-              还没有生成任务。可以先到主图或视频 Tab 创建第一条生成任务。
-            </div>
-          )}
-
-          <div className="mt-6 border-t border-slate-200 pt-5">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <h3 className="text-sm font-semibold text-slate-950">公开链接解析任务</h3>
-                <p className="mt-1 text-sm text-slate-500">用于把用户提交的公开商品页异步解析成竞品档案</p>
-              </div>
-              <span className="rounded-md bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-                {product.public_link_parse_tasks.length} 个任务
-              </span>
-            </div>
-
-            {product.public_link_parse_tasks.length > 0 ? (
-              <div className="mt-4 overflow-hidden rounded-md border border-slate-200">
-                <div className="grid grid-cols-[80px_110px_1fr_1.2fr] bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
-                  <span>ID</span>
-                  <span>状态</span>
-                  <span>链接</span>
-                  <span>结果 / 错误</span>
-                </div>
-                <div className="divide-y divide-slate-200">
-                  {product.public_link_parse_tasks.map((task) => (
-                    <div
-                      key={task.id}
-                      className="grid grid-cols-[80px_110px_1fr_1.2fr] items-center gap-3 px-3 py-3 text-sm"
-                    >
-                      <span className="font-medium text-slate-700">#{task.id}</span>
-                      <LinkParseTaskStatusBadge status={task.status} />
-                      <a href={task.url} target="_blank" rel="noreferrer" className="truncate text-sky-700 hover:text-sky-900">
-                        {task.url}
-                      </a>
-                      {task.error ? (
-                        <p className="line-clamp-2 text-xs leading-5 text-rose-700">{task.error}</p>
-                      ) : task.result.competitor_id ? (
-                        <p className="text-xs text-slate-600">已生成竞品 #{String(task.result.competitor_id)}</p>
-                      ) : (
-                        <p className="text-xs text-slate-500">
-                          {task.next_run_at ? `等待执行：${task.next_run_at}` : "等待后台调度"}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="mt-4 rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                还没有公开链接解析任务。可以在概览里提交竞品链接。
-              </div>
-            )}
-          </div>
-        </section>
-        ) : null}
-
-        {activeTab === "video" ? (
-        <section className="rounded-md border border-slate-200 bg-white p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold">短视频脚本</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                先生成可拍摄脚本，后续再接视频生成或达人协作流程
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="rounded-md bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-                {videoScripts.length > 0 ? `最近 ${videoScripts.length} 条脚本` : "待生成"}
-              </span>
-              <form action={`/products/${product.id}/creative-plans/video-scripts/generate`} method="post">
-                <button
-                  type="submit"
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800"
-                >
-                  <Video className="h-4 w-4" aria-hidden="true" />
-                  生成脚本
-                </button>
-              </form>
-            </div>
-          </div>
-
-          {videoScripts.length === 0 ? (
-            <div className="mt-5 rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">
-              还没有短视频脚本。建议先有诊断和主图方向后再生成。
-            </div>
-          ) : (
-            <div className="mt-5 grid gap-4">
-              {videoScripts.map((script) => (
-                <div key={script.id} className="rounded-md border border-slate-200 p-4">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <p className="text-base font-semibold text-slate-950">{script.title}</p>
-                      <p className="mt-1 text-sm leading-6 text-slate-500">
-                        {planText(script.content, "angle")}
-                      </p>
-                    </div>
-                    <div className="grid gap-2">
-                      <span className="w-fit rounded-md bg-violet-50 px-2 py-1 text-xs text-violet-700">
-                        {planValue(script.content, "duration_seconds")}s
-                      </span>
-                      <CreativePlanStatusActions productId={product.id} plan={script} tab="video" canEdit={canEdit} />
+                      <Link className="btn" href={`/products/${product.id}?tab=review`}>查看经营数据</Link>
                     </div>
                   </div>
 
-                  <div className="mt-4 rounded-md bg-violet-50 px-3 py-2">
-                    <p className="text-xs font-medium text-violet-700">开头钩子</p>
-                    <p className="mt-1 text-sm leading-6 text-slate-800">
-                      {planText(script.content, "hook")}
-                    </p>
-                  </div>
-
-                  <div className="mt-4 overflow-hidden rounded-md border border-slate-200">
-                    <div className="grid grid-cols-[90px_1fr_1fr] bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
-                      <span>镜头</span>
-                      <span>画面</span>
-                      <span>口播</span>
-                    </div>
-                    <div className="divide-y divide-slate-200">
-                      {planScenes(script.content).map((scene) => (
-                        <div
-                          key={`${script.id}-${scene.shot}`}
-                          className="grid grid-cols-[90px_1fr_1fr] gap-3 px-3 py-3 text-sm leading-6"
-                        >
-                          <span className="font-medium text-slate-700">{scene.shot}</span>
-                          <span className="text-slate-600">{scene.visual}</span>
-                          <span className="text-slate-800">{scene.voiceover}</span>
+                  <div className="lead-side">
+                    <span className="eyebrow">BLOCKERS · 待你处理 {blockedJobs.length} 项</span>
+                    {blockedJobs.length > 0 ? (
+                      <div className="trace">
+                        <div className="trace-hd">
+                          <span>需要人工介入</span>
+                          <span>{blockedJobs.length} 项</span>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="mt-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <p className="text-xs font-medium text-slate-500">视频草稿</p>
-                      <JobStatusBadge job={latestJob(product.generation_jobs, script.id, "video_asset")} />
-                      {canEdit ? (
-                        <form action={`/products/${product.id}/creative-plans/${script.id}/videos/generate`} method="post">
-                        <button
-                          type="submit"
-                          className="inline-flex h-8 items-center justify-center gap-2 rounded-md bg-violet-600 px-3 text-xs font-semibold text-white transition hover:bg-violet-700"
-                        >
-                          <Video className="h-3.5 w-3.5" aria-hidden="true" />
-                          生成视频草稿
-                        </button>
-                        </form>
-                      ) : null}
-                    </div>
-                    {generatedVideos(script.content).length > 0 ? (
-                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                        {generatedVideos(script.content).map((video) => (
-                          <div
-                            key={video.url}
-                            className="overflow-hidden rounded-md border border-slate-200 bg-slate-50"
-                          >
-                            <video
-                              src={absoluteMediaUrl(video.url)}
-                              controls
-                              className="aspect-video w-full bg-black object-contain"
-                            />
-                            <div className="px-3 py-2 text-xs text-slate-500">
-                              {video.model || "video model"} · {video.size || "video"} · {video.duration || "-"}s
-                            </div>
+                        {blockedJobs.map((job) => (
+                          <div key={job.id} className="trace-step todo-step">
+                            <span className="trace-dot fail" aria-hidden="true"></span>
+                            <p>
+                              <b>生成任务 #{job.id} {job.kind === "video_asset" ? "视频" : "图片"}草稿失败</b>
+                              {job.error ? ` · ${job.error}` : ""}
+                            </p>
+                            {canEdit ? (
+                              <form action={`/products/${product.id}/generation-jobs/${job.id}/retry`} method="post">
+                                <input type="hidden" name="tab" value={activeTab} />
+                                <button type="submit" className="btn">重试</button>
+                              </form>
+                            ) : null}
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <div className="mt-3 rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-5 text-center text-sm text-slate-500">
-                        还没有视频草稿。确认脚本后可先生成 1 条测试视频。
+                      <div className="trace">
+                        <div className="trace-hd">
+                          <span>需要人工介入</span>
+                          <span>0 项</span>
+                        </div>
+                        <div className="trace-step todo-step">
+                          <span className="trace-dot done" aria-hidden="true"></span>
+                          <p><b>没有失败的生成任务</b> · 有新任务时这里会出现重试入口</p>
+                        </div>
                       </div>
                     )}
-                    <JobError job={latestJob(product.generation_jobs, script.id, "video_asset")} />
+                    <p className="t-mini mono">只读权限账号下，以上写操作按钮全部隐藏（canEdit 逻辑）。</p>
+                  </div>
+                </div>
+              </section>
+
+              {/* 首屏 KPI：只有 1 个 accent 顶边 = 当前关注项 */}
+              <section aria-label="关键数字">
+                <div className="kpi-grid">
+                  <article className={competitorInsights.cheaperCount > 0 ? "kpi is-lead" : "kpi"}>
+                    <span className="kpi-lbl"><svg className="ic ic-sm" aria-hidden="true"><use href="#i-db"></use></svg>售价</span>
+                    <span className={`kpi-val${product.price ? "" : " is-idle"}`}>{product.price ? `¥${product.price}` : "未填写"}</span>
+                    <p className="kpi-desc">
+                      {priceSpread.length > 0
+                        ? `竞品价格带 ${formatNumberMoney(competitorInsights.minPrice ?? 0)} - ${formatNumberMoney(competitorInsights.maxPrice ?? 0)}，均价 ${formatNumberMoney(competitorInsights.averagePrice ?? 0)}。`
+                        : "还没有竞品价格样本，补竞品后这里会出现价格带对比。"}
+                    </p>
+                    <div className="kpi-foot">
+                      {competitorInsights.cheaperCount > 0 ? (
+                        <span className="badge badge-accent">{competitorInsights.cheaperCount} 个竞品低于本品</span>
+                      ) : (
+                        <span className="badge badge-info">价格在样本区间内</span>
+                      )}
+                      <span className="mono-note">下一步 · 复盘决定是否调价</span>
+                    </div>
+                  </article>
+
+                  <article className="kpi">
+                    <span className="kpi-lbl"><svg className="ic ic-sm" aria-hidden="true"><use href="#i-search"></use></svg>竞品样本</span>
+                    <span className="kpi-val">{product.competitors.length}</span>
+                    <p className="kpi-desc">
+                      {competitorInsights.competitorCount > 0
+                        ? `价格带 ${competitorInsights.minPrice !== null ? formatNumberMoney(competitorInsights.minPrice) : "—"} – ${competitorInsights.maxPrice !== null ? formatNumberMoney(competitorInsights.maxPrice) : "—"}；本品低于 ${competitorInsights.higherCount} 个、高于 ${competitorInsights.cheaperCount} 个。已启用监控 ${product.competitor_monitors?.filter((monitor) => monitor.status === "active").length ?? 0} 个。`
+                        : "建议先录入 3 个同价位或同类目爆款，价格带与卖点判断才有抓手。"}
+                    </p>
+                    <div className="kpi-foot">
+                      <span className="badge badge-info">数据完整度 {competitorInsights.completeness}%</span>
+                      <span className="mono-note">{missingLinkCompetitors > 0 ? `${missingLinkCompetitors} 个竞品缺少链接` : "链接齐备"}</span>
+                    </div>
+                  </article>
+
+                  <article className="kpi">
+                    <span className="kpi-lbl"><svg className="ic ic-sm" aria-hidden="true"><use href="#i-copy"></use></svg>素材资产</span>
+                    <span className="kpi-val">{assetLibrary.length}</span>
+                    <p className="kpi-desc">
+                      主图 {imageAssetCount} · 视频 {videoAssetCount}
+                      {assetLibrary.length > 0 ? "；素材状态与评分在素材库页签维护，可挂经营数据做归因。" : "。先生成主图方案与视频脚本，再出图出片。"}
+                    </p>
+                    <div className="kpi-foot">
+                      <span className="badge">主图 {imageAssetCount} · 视频 {videoAssetCount}</span>
+                      <span className="mono-note">{assetStatusCounts}</span>
+                    </div>
+                  </article>
+
+                  <article className="kpi">
+                    <span className="kpi-lbl"><svg className="ic ic-sm" aria-hidden="true"><use href="#i-check"></use></svg>整体 ROI</span>
+                    <span className={`kpi-val${performanceSummary.roi === null ? " is-idle" : ""}`}>
+                      {performanceSummary.roi === null ? "待回填" : formatNumberDecimal(performanceSummary.roi)}
+                    </span>
+                    <p className="kpi-desc">
+                      {performanceSummary.recordCount > 0
+                        ? `${performanceSummary.recordCount} 条经营数据：曝光 ${formatInteger(performanceSummary.impressions)}、成交 ${performanceSummary.conversions} 单、花费 ${formatNumberMoney(performanceSummary.spend)}。`
+                        : "还没有经营数据。录入一条数据，才谈得上归因与复盘。"}
+                    </p>
+                    <div className="kpi-foot">
+                      <span className="badge">口径：人工回填</span>
+                      <span className="mono-note">非平台实时扣费数据</span>
+                    </div>
+                  </article>
+                </div>
+              </section>
+
+              {/* 单品运营流程（7 步闭环） */}
+              <ProductWorkflowPanel steps={workflowSteps} />
+
+              {/* 页签导航（?tab= 路由切换，与 ?section= 锚点参数等价） */}
+              <ProductTabNav productId={product.id} activeTab={activeTab} />
+
+              {!canEdit ? (
+                <div className="alert alert-warn">
+                  <svg className="ic" aria-hidden="true"><use href="#i-warn"></use></svg>
+                  <span><b className="h">当前账号为只读权限</b> —— 生成、保存、取消、重试和导入等写操作按钮已隐藏。真实鉴权仍由后端 API 兜底，前端隐藏只是减少误操作。</span>
+                  <span className="badge badge-warn">canEdit = false</span>
+                </div>
+              ) : null}
+
+              <GenerationJobSummary
+                activeTab={activeTab}
+                canEdit={canEdit}
+                jobs={recentJobs}
+                productId={product.id}
+              />
+
+              {activeTab === "agent" ? (
+                <AgentRunPanel productId={product.id} initialRuns={agentRuns} canEdit={canEdit} />
+              ) : null}
+
+              {activeTab === "overview" ? (
+                <section className="sec" id="overview" aria-labelledby="h-overview">
+                  <div className="sec-hd">
+                    <div className="stack-2">
+                      <span className="eyebrow">SECTION 01 · TAB=OVERVIEW · 商品&竞品</span>
+                      <h2 id="h-overview">建档 · SKU 库存 · 平台映射 · 竞品洞察 · 快照监控</h2>
+                    </div>
+                    <span className="mono-note">左侧 4 个录入表单折叠收纳；事实面板提到前面</span>
                   </div>
 
-                  <div className="mt-4 grid gap-3 md:grid-cols-[1fr_220px]">
-                    <div>
-                      <p className="text-xs font-medium text-slate-500">卖点证明</p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {planList(script.content, "selling_point_proof").map((point) => (
-                          <span key={point} className="rounded-md bg-slate-100 px-2.5 py-1 text-xs text-slate-700">
-                            {point}
-                          </span>
-                        ))}
+                  <div className="grid-1-2">
+                    <div className="stack-4">
+                      <div className="panel">
+                        <div className="panel-head"><h3>商品档案</h3><span className="badge">ProductEditForm</span></div>
+                        <div className="panel-body">
+                          <ProductEditForm product={product} canEdit={canEdit} />
+                        </div>
+                      </div>
+                      <div className="panel">
+                        <div className="panel-head"><h3>新建 SKU</h3><span className="badge">SkuCreateForm</span></div>
+                        <div className="panel-body">
+                          <SkuCreateForm productId={product.id} canEdit={canEdit} />
+                        </div>
+                      </div>
+                      <div className="panel">
+                        <div className="panel-head"><h3>竞品链接导入</h3><span className="badge">CompetitorUrlImportForm</span></div>
+                        <div className="panel-body">
+                          <CompetitorUrlImportForm productId={product.id} canEdit={canEdit} />
+                        </div>
+                      </div>
+                      <div className="panel">
+                        <div className="panel-head"><h3>手动录入竞品</h3><span className="badge">CompetitorCreateForm</span></div>
+                        <div className="panel-body">
+                          <CompetitorCreateForm productId={product.id} canEdit={canEdit} />
+                        </div>
                       </div>
                     </div>
-                    <PlanField label="转化引导" value={planText(script.content, "cta")} highlight />
-                  </div>
 
-                  {canEdit ? (
-                    <details className="mt-4 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-                    <summary className="cursor-pointer text-sm font-medium text-slate-700">
-                      编辑脚本
-                    </summary>
-                      <VideoScriptEditForm productId={product.id} script={script} />
-                    </details>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-        ) : null}
+                    <div className="stack-4">
+                      <SkuInventoryPanel
+                        productId={product.id}
+                        skus={product.skus ?? []}
+                        skuStatus={resolvedSearchParams?.sku}
+                        inventoryStatus={resolvedSearchParams?.inventory}
+                        canEdit={canEdit}
+                      />
 
-        {activeTab === "main-images" ? (
-        <section className="rounded-md border border-slate-200 bg-white p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold">主图方案</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                先生成能执行的设计方向，后续再接图片生成模型
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="rounded-md bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-                {mainImagePlans.length > 0 ? `最近 ${mainImagePlans.length} 个方案` : "待生成"}
-              </span>
-              <form action={`/products/${product.id}/creative-plans/main-images/generate`} method="post">
-                <button
-                  type="submit"
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800"
-                >
-                  <ImageIcon className="h-4 w-4" aria-hidden="true" />
-                  生成主图
-                </button>
-              </form>
-            </div>
-          </div>
+                      {/* 库存流水：InventoryMovement 五类型（inbound / outbound / adjustment / lock / release） */}
+                      <div className="panel">
+                        <div className="panel-head">
+                          <h3>库存流水</h3>
+                          <div className="row">
+                            <span className="badge">{inventoryMovements.length} 条</span>
+                            <span className="mono-note">全部库存变化可追溯到 InventoryMovement</span>
+                          </div>
+                        </div>
+                        {inventoryMovements.length > 0 ? (
+                          <div className="tbl-wrap">
+                            <table className="tbl tbl-l">
+                              <caption className="sr-only">库存变动流水，共 {inventoryMovements.length} 条</caption>
+                              <thead>
+                                <tr>
+                                  <th scope="col">时间</th>
+                                  <th scope="col">类型</th>
+                                  <th scope="col" className="num">库存变化</th>
+                                  <th scope="col" className="num">锁定变化</th>
+                                  <th scope="col">原因</th>
+                                  <th scope="col">操作人</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {inventoryMovements.slice(0, 20).map((movement: InventoryMovement) => (
+                                  <InventoryMovementRow key={movement.id} movement={movement} />
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <div className="panel-body">
+                            <div className="empty">
+                              <svg className="ic ic-lg" aria-hidden="true"><use href="#i-db"></use></svg>
+                              <h4>还没有库存流水</h4>
+                              <p>人工盘点、导入修正、下单锁定与释放都会在这里留下流水，方便追溯每一次库存变化。</p>
+                              <p className="empty-next">
+                                <svg className="ic ic-sm" aria-hidden="true"><use href="#i-chev"></use></svg>
+                                调整库存后这里出现：类型 · 库存变化 · 锁定变化 · 原因 · 操作人
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
 
-          {mainImagePlans.length === 0 ? (
-            <div className="mt-5 rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">
-              还没有主图方案。建议先生成诊断，再点击右侧“生成主图”。
-            </div>
-          ) : (
-            <div className="mt-5 grid gap-4 lg:grid-cols-2">
-              {mainImagePlans.map((plan) => (
-                <div key={plan.id} className="rounded-md border border-slate-200 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-base font-semibold text-slate-950">{plan.title}</p>
-                      <p className="mt-1 text-sm leading-6 text-slate-500">
-                        {planText(plan.content, "angle")}
-                      </p>
+                      <PlatformMappingPanel
+                        productId={product.id}
+                        productPlatform={product.platform}
+                        productStoreId={product.store_id}
+                        stores={stores}
+                        skus={product.skus ?? []}
+                        mappings={product.platform_mappings ?? []}
+                        mappingStatus={resolvedSearchParams?.mapping}
+                        canEdit={canEdit}
+                      />
+
+                      <div className="stack-4">
+                        <CompetitorImportAlert
+                          competitorStatus={resolvedSearchParams?.competitor}
+                          importStatus={resolvedSearchParams?.competitor_import}
+                        />
+                        <CompetitorInsightsPanel insights={competitorInsights} />
+
+                        <div className="panel">
+                          <div className="panel-head">
+                            <div className="stack-2">
+                              <h3>竞品列表</h3>
+                              <p className="mono-note">先把市场参照物摆上桌面，后续分析才有抓手</p>
+                            </div>
+                            <span className="badge">
+                              {priceSpread.length > 0
+                                ? `价格样本 ${Math.min(...priceSpread)}-${Math.max(...priceSpread)}`
+                                : "待补充价格"}
+                            </span>
+                          </div>
+                          <div className="tbl-wrap">
+                            <table className="tbl tbl-x">
+                              <caption className="sr-only">竞品列表，共 {product.competitors.length} 条</caption>
+                              <thead>
+                                <tr>
+                                  <th scope="col">竞品</th>
+                                  <th scope="col">平台</th>
+                                  <th scope="col" className="num">售价</th>
+                                  <th scope="col" className="wrap-cell">标题</th>
+                                  <th scope="col" className="wrap-cell">卖点</th>
+                                  <th scope="col">动作</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {product.competitors.length === 0 ? (
+                                  <tr>
+                                    <td colSpan={6}>
+                                      <div className="empty">
+                                        <svg className="ic ic-lg" aria-hidden="true"><use href="#i-search"></use></svg>
+                                        <h4>还没有竞品样本</h4>
+                                        <p>建议先录入 3 个同价位或同类目爆款。没有竞品，价格带与卖点判断只能靠猜，诊断和主图方向都会偏。</p>
+                                        <p className="empty-next">
+                                          <svg className="ic ic-sm" aria-hidden="true"><use href="#i-chev"></use></svg>
+                                          录入后这里出现价格带 / 均价 / 卖点频次，以及每条竞品的监控节奏与快照变化
+                                        </p>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ) : (
+                                  product.competitors.map((competitor) => (
+                                    <tr key={competitor.id}>
+                                      <td>
+                                        <div className="cell-goods">
+                                          <span className="thumb thumb-sm" aria-hidden="true">IMG</span>
+                                          <span>
+                                            <b>{competitor.name}</b>
+                                            <span>{competitor.url ? "已录入链接" : "缺少链接"}</span>
+                                          </span>
+                                        </div>
+                                      </td>
+                                      <td>{platformLabels[competitor.platform]}</td>
+                                      <td className="num">{competitor.price ? `¥${competitor.price}` : "-"}</td>
+                                      <td>{competitor.title ?? "-"}</td>
+                                      <td>
+                                        <div className="chip-row">
+                                          {competitor.selling_points.slice(0, 3).map((point) => (
+                                            <span key={point} className="tag">{point}</span>
+                                          ))}
+                                        </div>
+                                      </td>
+                                      <td>
+                                        <div className="actions">
+                                          {competitor.url ? (
+                                            <a className="lnk" href={competitor.url} target="_blank" rel="noreferrer">
+                                              <svg className="ic ic-sm" aria-hidden="true"><use href="#i-ext"></use></svg>查看链接
+                                            </a>
+                                          ) : (
+                                            <span className="mono-note">未填链接</span>
+                                          )}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  ))
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+
+                        <CompetitorMonitorPanel
+                          competitors={product.competitors}
+                          monitors={product.competitor_monitors ?? []}
+                          productId={product.id}
+                          canEdit={canEdit}
+                        />
+                      </div>
                     </div>
-                    <CreativePlanStatusActions productId={product.id} plan={plan} tab="main-images" canEdit={canEdit} />
+                  </div>
+                </section>
+              ) : null}
+
+              {activeTab === "diagnosis" ? (
+                <section className="sec" id="diagnosis" aria-labelledby="h-diagnosis">
+                  <div className="sec-hd">
+                    <div className="stack-2">
+                      <span className="eyebrow">SECTION 03 · TAB=DIAGNOSIS · 诊断</span>
+                      <h2 id="h-diagnosis">定位 · 价格带 · 痛点 · 卖点判断 · 风险 · 下一步建议</h2>
+                    </div>
+                    <span className="mono-note">诊断是下游一切生成物（主图 / 视频 / 投放建议）的输入</span>
                   </div>
 
-                  <div className="mt-4 grid gap-3">
-                    <PlanField label="主文案" value={planText(plan.content, "headline")} highlight />
-                    <PlanField label="副文案" value={planText(plan.content, "sub_headline")} />
-                    <PlanField label="画面布局" value={planText(plan.content, "layout")} />
-                    <PlanField label="视觉重点" value={planText(plan.content, "visual_focus")} />
-                  </div>
+                  <div className="grid-2-1">
+                    <div className="panel">
+                      <div className="panel-head">
+                        <h3>商品诊断</h3>
+                        {canEdit ? (
+                          <form action={`/products/${product.id}/diagnoses/generate`} method="post">
+                            <button type="submit" className="btn btn-primary">
+                              <svg className="ic ic-sm" aria-hidden="true"><use href="#i-arrow-r"></use></svg>生成诊断
+                            </button>
+                          </form>
+                        ) : null}
+                      </div>
+                      <div className="panel-body stack-4">
+                        {latestDiagnosis ? (
+                          <>
+                            <div className="tint tint-ok">
+                              <span className="tint-lbl">定位判断</span>
+                              <p>{latestDiagnosis.positioning}</p>
+                            </div>
+                            <div className="tint">
+                              <span className="tint-lbl">价格带判断</span>
+                              <p>{latestDiagnosis.price_band}</p>
+                            </div>
+                            <div className="grid-2">
+                              <DiagnosisList title="用户痛点" items={latestDiagnosis.pain_points} />
+                              <DiagnosisList title="卖点判断" items={latestDiagnosis.selling_point_analysis} />
+                              <DiagnosisList title="风险点" items={latestDiagnosis.risks} tone="warn" />
+                              <DiagnosisList title="下一步建议" items={latestDiagnosis.recommendations} tone="accent" />
+                            </div>
+                            {canEdit ? (
+                              <details className="boxed">
+                                <summary>
+                                  <svg className="ic ic-sm" aria-hidden="true"><use href="#i-chev"></use></svg>
+                                  编辑诊断（人工可改）
+                                </summary>
+                                <div className="stack-3" style={{ marginTop: "var(--sp-2)" }}>
+                                  <DiagnosisEditForm productId={product.id} diagnosis={latestDiagnosis} />
+                                </div>
+                              </details>
+                            ) : null}
+                          </>
+                        ) : (
+                          <div className="empty">
+                            <svg className="ic ic-lg" aria-hidden="true"><use href="#i-search"></use></svg>
+                            <h4>还没有诊断报告</h4>
+                            <p>建议补充至少 1-3 个竞品后生成第一版诊断。诊断是主图、视频与投放建议的共同输入，没有诊断时生成方向容易偏。</p>
+                            {canEdit ? (
+                              <div className="empty-actions">
+                                <form action={`/products/${product.id}/diagnoses/generate`} method="post">
+                                  <button type="submit" className="btn btn-primary">生成诊断</button>
+                                </form>
+                              </div>
+                            ) : null}
+                            <p className="empty-next">
+                              <svg className="ic ic-sm" aria-hidden="true"><use href="#i-chev"></use></svg>
+                              生成后这里出现：定位 · 价格带 · 痛点 · 卖点判断 · 风险 · 下一步建议
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
 
-                  <div className="mt-4">
-                    <p className="text-xs font-medium text-slate-500">证明点</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {planList(plan.content, "proof_points").map((point) => (
-                        <span key={point} className="rounded-md bg-slate-100 px-2.5 py-1 text-xs text-slate-700">
-                          {point}
-                        </span>
-                      ))}
+                    <div className="stack-4">
+                      <div className="panel">
+                        <div className="panel-head"><h3>主图方案</h3><span className={mainImagePlans.length > 0 ? "badge badge-online" : "badge"}>{mainImagePlans.length > 0 ? `已有 ${mainImagePlans.length} 个` : "待生成"}</span></div>
+                        <div className="panel-body stack-3">
+                          <p>根据诊断结果生成可交给设计执行的画面方向。</p>
+                          {canEdit ? (
+                            <form action={`/products/${product.id}/creative-plans/main-images/generate`} method="post">
+                              <button type="submit" className="btn">
+                                <svg className="ic ic-sm" aria-hidden="true"><use href="#i-copy"></use></svg>生成主图
+                              </button>
+                            </form>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="panel">
+                        <div className="panel-head"><h3>短视频脚本</h3><span className={videoScripts.length > 0 ? "badge badge-online" : "badge"}>{videoScripts.length > 0 ? `已有 ${videoScripts.length} 个` : "待生成"}</span></div>
+                        <div className="panel-body stack-3">
+                          <p>生成开头钩子、镜头分镜、口播和转化引导。</p>
+                          {canEdit ? (
+                            <form action={`/products/${product.id}/creative-plans/video-scripts/generate`} method="post">
+                              <button type="submit" className="btn">
+                                <svg className="ic ic-sm" aria-hidden="true"><use href="#i-terminal"></use></svg>生成脚本
+                              </button>
+                            </form>
+                          ) : null}
+                        </div>
+                      </div>
+                      <StageCard
+                        icon="#i-db"
+                        title="投放复盘"
+                        detail="录入曝光、点击、转化、ROI 后判断下一步动作"
+                        actionLabel="去复盘"
+                        actionHref={`/products/${product.id}?tab=review`}
+                      />
                     </div>
                   </div>
+                </section>
+              ) : null}
 
-                  <div className="mt-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <p className="text-xs font-medium text-slate-500">图片草稿</p>
-                      <JobStatusBadge job={latestJob(product.generation_jobs, plan.id, "main_image_asset")} />
-                      {canEdit ? (
-                        <form action={`/products/${product.id}/creative-plans/${plan.id}/images/generate`} method="post">
-                        <button
-                          type="submit"
-                          className="inline-flex h-8 items-center justify-center gap-2 rounded-md bg-emerald-600 px-3 text-xs font-semibold text-white transition hover:bg-emerald-700"
-                        >
-                          <ImageIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                          生成图片草稿
-                        </button>
-                        </form>
+              {activeTab === "review" ? (
+                <section className="sec" id="review" aria-labelledby="h-review">
+                  <div className="sec-hd">
+                    <div className="stack-2">
+                      <span className="eyebrow">SECTION 09 · TAB=REVIEW · 数据与复盘</span>
+                      <h2 id="h-review">回填经营数据 · 汇总与趋势 · 周期复盘报告</h2>
+                    </div>
+                    <span className="mono-note">PerformanceRecord 可关联素材 / 链接 / 实验用于归因；复盘拆成洞察与下一步动作两个可编辑列表</span>
+                  </div>
+
+                  <div className="grid-1-2">
+                    <div className="stack-4">
+                      <div className="panel">
+                        <div className="panel-head"><h3>录入经营数据</h3><span className="badge">PerformanceRecordForm</span></div>
+                        <div className="panel-body">
+                          <PerformanceRecordForm
+                            productId={product.id}
+                            creativePlans={product.creative_plans}
+                            generatedAssets={product.generated_assets}
+                            promotionLinks={product.promotion_links}
+                            adExperiments={product.ad_experiments}
+                            canEdit={canEdit}
+                          />
+                        </div>
+                      </div>
+                      <div className="panel">
+                        <div className="panel-head"><h3>CSV 导入经营数据</h3><span className="badge">PerformanceImportForm</span></div>
+                        <div className="panel-body">
+                          <PerformanceImportForm productId={product.id} canEdit={canEdit} />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="stack-4">
+                      <PerformanceImportAlert
+                        count={resolvedSearchParams?.count}
+                        importStatus={resolvedSearchParams?.import}
+                        performanceStatus={resolvedSearchParams?.performance}
+                      />
+                      <PerformanceSummaryCards summary={performanceSummary} />
+                      <PerformanceTrendPanel records={product.performance_records} />
+
+                      <div className="panel">
+                        <div className="panel-head">
+                          <div className="stack-2">
+                            <h3>投放复盘报告</h3>
+                            <p className="mono-note">录入经营数据后生成周期复盘，判断下一步换图、调价还是调人群</p>
+                          </div>
+                          {canEdit ? (
+                            <form action={`/products/${product.id}/review-reports/generate`} method="post">
+                              <button type="submit" className="btn btn-primary">
+                                <svg className="ic ic-sm" aria-hidden="true"><use href="#i-check"></use></svg>生成复盘
+                              </button>
+                            </form>
+                          ) : null}
+                        </div>
+                        <div className="panel-body stack-4">
+                          {latestReviewReport ? (
+                            <>
+                              <div className="tint tint-warn">
+                                <span className="tint-lbl">本期摘要 · {latestReviewReport.period_start} 至 {latestReviewReport.period_end}</span>
+                                <p>{latestReviewReport.summary}</p>
+                              </div>
+                              <div className="grid-2">
+                                <ReviewList title="复盘洞察" items={latestReviewReport.insights} />
+                                <ReviewList title="下一步动作" items={latestReviewReport.next_actions} tone="accent" />
+                              </div>
+                              {canEdit ? (
+                                <details className="boxed">
+                                  <summary>
+                                    <svg className="ic ic-sm" aria-hidden="true"><use href="#i-chev"></use></svg>
+                                    编辑复盘（摘要 / 洞察 / 下一步动作）
+                                  </summary>
+                                  <div className="stack-3" style={{ marginTop: "var(--sp-2)" }}>
+                                    <ReviewReportEditForm productId={product.id} report={latestReviewReport} />
+                                  </div>
+                                </details>
+                              ) : null}
+                            </>
+                          ) : (
+                            <div className="empty">
+                              <svg className="ic ic-lg" aria-hidden="true"><use href="#i-doc"></use></svg>
+                              <h4>暂无复盘报告</h4>
+                              <p>先录入一条经营数据，再生成复盘。复盘会把周期数据拆成洞察与下一步动作两个可编辑列表。</p>
+                              <p className="empty-next">
+                                <svg className="ic ic-sm" aria-hidden="true"><use href="#i-chev"></use></svg>
+                                生成后这里出现：本期摘要 · 复盘洞察 · 下一步动作
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="panel">
+                        <div className="panel-head">
+                          <h3>最近经营数据</h3>
+                          <span className="badge">{performanceRecords.length} 条记录</span>
+                        </div>
+                        <div className="tbl-wrap">
+                          <table className="tbl tbl-x">
+                            <caption className="sr-only">最近经营数据，共 {performanceRecords.length} 条</caption>
+                            <thead>
+                              <tr>
+                                <th scope="col">周期</th>
+                                <th scope="col">实验</th>
+                                <th scope="col">素材</th>
+                                <th scope="col">链接</th>
+                                <th scope="col" className="num">CTR</th>
+                                <th scope="col" className="num">转化率</th>
+                                <th scope="col" className="num">花费</th>
+                                <th scope="col" className="num">ROI</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {performanceRecords.length === 0 ? (
+                                <tr>
+                                  <td colSpan={8}>
+                                    <div className="empty">
+                                      <svg className="ic ic-lg" aria-hidden="true"><use href="#i-db"></use></svg>
+                                      <h4>还没有经营数据</h4>
+                                      <p>录入一条数据，才谈得上归因与复盘。没有数据时，素材放量建议、实验决策与复盘都不会出现。</p>
+                                      <p className="empty-next">
+                                        <svg className="ic ic-sm" aria-hidden="true"><use href="#i-chev"></use></svg>
+                                        录入后出现汇总卡、趋势条，以及按素材 / 链接维度的归因表
+                                      </p>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ) : (
+                                performanceRecords.map((record) => (
+                                  <tr key={record.id}>
+                                    <td className="key">{record.period_start} 至 {record.period_end}</td>
+                                    <td>{adExperimentTitle(product.ad_experiments, record.ad_experiment_id)}</td>
+                                    <td>{creativePlanTitle(product.creative_plans, record.creative_plan_id)}</td>
+                                    <td>{promotionLinkTitle(product.promotion_links, record.promotion_link_id)}</td>
+                                    <td className="num">{formatPercent(record.ctr)}</td>
+                                    <td className="num">{formatPercent(record.conversion_rate)}</td>
+                                    <td className="num">{formatMoney(record.spend)}</td>
+                                    <td className="num">{formatDecimal(record.roi)}</td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                        <div className="tbl-note">
+                          <svg className="ic ic-sm" aria-hidden="true"><use href="#i-doc"></use></svg>
+                          <span>列口径：周期 / 实验 / 素材 / 链接 / CTR / 转化率 / 花费 / ROI —— ROI 由 成交额 ÷ 花费 计算。</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              ) : null}
+
+              {activeTab === "links" ? (
+                <section className="sec" id="links" aria-labelledby="h-links">
+                  <div className="sec-hd">
+                    <div className="stack-2">
+                      <span className="eyebrow">SECTION 06 · TAB=LINKS · 链接</span>
+                      <h2 id="h-links">系统生成链接 · 手动录入 · 短链归因</h2>
+                    </div>
+                    <span className="mono-note">PromotionLink：link_type · short_code 短链 · tracking_code 归因参数 · click_count 点击计数</span>
+                  </div>
+
+                  <div className="grid-1-2">
+                    <div className="stack-4">
+                      <div className="panel">
+                        <div className="panel-head"><h3>生成推荐链接</h3><span className="badge badge-accent">系统链接</span></div>
+                        <div className="panel-body stack-3">
+                          <p>按商品承接页、短视频投放和主图测试三种场景各生成一条带 tracking_code 的链接。</p>
+                          {canEdit ? (
+                            <form action={`/products/${product.id}/promotion-links/generate`} method="post">
+                              <button type="submit" className="btn btn-primary">
+                                <svg className="ic ic-sm" aria-hidden="true"><use href="#i-ext"></use></svg>生成链接
+                              </button>
+                            </form>
+                          ) : null}
+                          <p className="mono-note">生成失败会提示检查商品 ID 与承接页配置。</p>
+                        </div>
+                      </div>
+
+                      <div className="panel">
+                        <div className="panel-head"><h3>手动添加链接</h3><span className="badge">PromotionLinkCreateForm</span></div>
+                        <div className="panel-body">
+                          <PromotionLinkCreateForm canEdit={canEdit} productId={product.id} />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="stack-4">
+                      <PromotionLinkAlert status={resolvedSearchParams?.links} />
+                      <PromotionLinkAttributionPanel
+                        links={product.promotion_links}
+                        records={product.performance_records}
+                      />
+
+                      <div className="panel">
+                        <div className="panel-head">
+                          <div className="stack-2">
+                            <h3>推荐链接库</h3>
+                            <p className="mono-note">管理商品承接、短视频投放、主图测试和私域转发链接</p>
+                          </div>
+                          <span className="badge">{product.promotion_links.length} 个链接</span>
+                        </div>
+                        <div className="panel-body stack-3">
+                          {product.promotion_links.length > 0 ? (
+                            product.promotion_links.map((link) => (
+                              <PromotionLinkCard key={link.id} link={link} />
+                            ))
+                          ) : (
+                            <div className="empty">
+                              <svg className="ic ic-lg" aria-hidden="true"><use href="#i-ext"></use></svg>
+                              <h4>还没有推荐链接</h4>
+                              <p>可以先生成一组系统链接，或手动添加平台推广链接。短链点击只计数，不触发投放或库存动作。</p>
+                              <p className="empty-next">
+                                <svg className="ic ic-sm" aria-hidden="true"><use href="#i-chev"></use></svg>
+                                保存后这里出现：链接名称 · 类型 · 短链与原链 · tracking_code · 归因数据
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              ) : null}
+
+              {activeTab === "ads" ? (
+                <section className="sec" id="ads" aria-labelledby="h-ads">
+                  <div className="sec-hd">
+                    <div className="stack-2">
+                      <span className="eyebrow">SECTION 07 · TAB=ADS · 投放</span>
+                      <h2 id="h-ads">投放工作流 · 实验看板 · 实验计划 · 投放建议与人工确认</h2>
+                    </div>
+                    <span className="mono-note">系统只做计划与记录，不自动执行资金操作；建议确认与实验状态都必须由人工维护</span>
+                  </div>
+
+                  <div className="stack-4">
+                    <AdWorkflowPanel product={product} />
+                    <AdLinkRecommendationPanel
+                      links={product.promotion_links}
+                      records={product.performance_records}
+                    />
+                    <AdAssetRecommendationPanel
+                      assets={product.generated_assets}
+                      records={product.performance_records}
+                    />
+                    <AdExperimentDashboardPanel
+                      dashboard={adExperimentDashboard}
+                      assets={product.generated_assets}
+                      links={product.promotion_links}
+                    />
+                    <AdExperimentPanel
+                      experiments={adExperiments}
+                      assets={product.generated_assets}
+                      links={product.promotion_links}
+                      productId={product.id}
+                      status={resolvedSearchParams?.experiment}
+                      canEdit={canEdit}
+                    />
+
+                    <div className="panel">
+                      <div className="panel-head">
+                        <div className="stack-2">
+                          <h3>投放建议</h3>
+                          <p className="mono-note">基于诊断、素材方向和经营数据，生成下一轮人群、预算、素材测试和风控建议</p>
+                        </div>
+                        {canEdit ? (
+                          <form action={`/products/${product.id}/ad-recommendations/generate`} method="post">
+                            <button type="submit" className="btn btn-primary">
+                              <svg className="ic ic-sm" aria-hidden="true"><use href="#i-arrow-r"></use></svg>生成投放建议
+                            </button>
+                          </form>
+                        ) : null}
+                      </div>
+                      <div className="panel-body stack-4">
+                        {latestAdRecommendation ? (
+                          <>
+                            <div className="tint tint-ok">
+                              <span className="tint-lbl">建议摘要 · {latestAdRecommendation.source === "llm" ? "LLM 生成" : "规则生成"}</span>
+                              <p>{latestAdRecommendation.summary}</p>
+                              <div className="row" style={{ marginTop: "var(--sp-2)" }}>
+                                <span className={`badge ${adRecommendationConfirmationTone(latestAdRecommendation.confirmation_status)}`}>
+                                  {adRecommendationConfirmationLabel(latestAdRecommendation.confirmation_status)}
+                                </span>
+                                {latestAdRecommendation.confirmed_at ? (
+                                  <span className="mono-note">{formatDateTime(latestAdRecommendation.confirmed_at)}</span>
+                                ) : null}
+                              </div>
+                              {latestAdRecommendation.confirmation_note ? (
+                                <p style={{ marginTop: "var(--sp-2)" }}>{latestAdRecommendation.confirmation_note}</p>
+                              ) : null}
+                            </div>
+                            <PlanField label="本轮目标" value={contentText(latestAdRecommendation.content, "objective")} highlight />
+                            <div className="grid-2">
+                              <AdObjectList title="人群建议" items={contentObjects(latestAdRecommendation.content, "audience_segments")} />
+                              <BudgetPlan content={latestAdRecommendation.content} />
+                              <AdObjectList title="素材测试" items={contentObjects(latestAdRecommendation.content, "creative_tests")} />
+                              <AdTextList title="出价策略" items={contentList(latestAdRecommendation.content, "bid_strategy")} />
+                              <AdTextList title="风险控制" items={contentList(latestAdRecommendation.content, "risk_controls")} tone="warn" />
+                              <AdTextList title="下一步动作" items={contentList(latestAdRecommendation.content, "next_steps")} tone="accent" />
+                            </div>
+                            {canEdit ? (
+                              <details className="boxed" open>
+                                <summary>
+                                  <svg className="ic ic-sm" aria-hidden="true"><use href="#i-chev"></use></svg>
+                                  人工确认建议（投放前必须确认）
+                                </summary>
+                                <form
+                                  action={`/products/${product.id}/ad-recommendations/${latestAdRecommendation.id}/confirmation`}
+                                  method="post"
+                                  className="stack-3"
+                                  style={{ marginTop: "var(--sp-2)" }}
+                                >
+                                  <div className="field">
+                                    <label htmlFor="cf-note">确认备注</label>
+                                    <textarea
+                                      className="input"
+                                      id="cf-note"
+                                      name="confirmation_note"
+                                      defaultValue={latestAdRecommendation.confirmation_note ?? ""}
+                                      rows={2}
+                                      placeholder="记录确认人判断、预算边界或暂不执行原因"
+                                    />
+                                  </div>
+                                  <div className="row">
+                                    <button type="submit" name="confirmation_status" value="confirmed" className="btn btn-primary">
+                                      <svg className="ic ic-sm" aria-hidden="true"><use href="#i-check"></use></svg>确认建议
+                                    </button>
+                                    <button type="submit" name="confirmation_status" value="rejected" className="btn">暂不采纳</button>
+                                    <span className="mono-note">确认后记录 confirmed_at 与备注，进入实验计划；不触发任何扣费动作。</span>
+                                  </div>
+                                </form>
+                              </details>
+                            ) : null}
+                          </>
+                        ) : (
+                          <div className="empty">
+                            <svg className="ic ic-lg" aria-hidden="true"><use href="#i-agent"></use></svg>
+                            <h4>还没有投放建议</h4>
+                            <p>建议先生成诊断、主图/视频方案，并录入至少一条经营数据。投放建议只做计划，不自动执行资金操作。</p>
+                            <p className="empty-next">
+                              <svg className="ic ic-sm" aria-hidden="true"><use href="#i-chev"></use></svg>
+                              生成后这里出现：建议摘要 · 本轮目标 · 人群 / 预算 / 素材测试 / 风控 · 人工确认入口
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              ) : null}
+
+              {activeTab === "assets" ? (
+                <section className="sec" id="assets" aria-labelledby="h-assets">
+                  <div className="sec-hd">
+                    <div className="stack-2">
+                      <span className="eyebrow">SECTION 05 · TAB=ASSETS · 素材库</span>
+                      <h2 id="h-assets">素材效果归因 · 放量建议 · 版本 / 评分 / 标签</h2>
+                    </div>
+                    <span className="mono-note">GeneratedAsset：status · rating · tags · usage_contexts · asset_version；归因只汇总用户回填的经营数据</span>
+                  </div>
+
+                  <div className="stack-4">
+                    <AssetsSyncAlert status={resolvedSearchParams?.assets} />
+                    <AssetAttributionPanel
+                      assets={product.generated_assets}
+                      records={product.performance_records}
+                    />
+                    <AssetScaleRecommendationPanel
+                      assets={product.generated_assets}
+                      records={product.performance_records}
+                    />
+
+                    <div className="panel">
+                      <div className="panel-head">
+                        <div className="stack-2">
+                          <h3>素材资产库</h3>
+                          <p className="mono-note">汇总当前商品已生成的主图和视频草稿，可按版本 / 评分 / 标签管理并挂经营数据归因</p>
+                        </div>
+                        <div className="row">
+                          {canEdit ? (
+                            <form action={`/products/${product.id}/assets/sync`} method="post">
+                              <button type="submit" className="btn btn-sm">同步历史素材</button>
+                            </form>
+                          ) : null}
+                          <span className="badge">{assetLibrary.length} 个素材</span>
+                        </div>
+                      </div>
+                      <div className="panel-body">
+                        {assetLibrary.length > 0 ? (
+                          <div className="grid-3">
+                            {assetLibrary.map((asset) => (
+                              <article key={asset.url} className="asset">
+                                <div className="asset-fig">
+                                  {asset.kind === "image" ? (
+                                    <a href={absoluteMediaUrl(asset.url)} target="_blank" rel="noreferrer">
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img
+                                        src={absoluteMediaUrl(asset.url)}
+                                        alt={asset.title}
+                                        style={{ width: "100%", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }}
+                                      />
+                                    </a>
+                                  ) : (
+                                    <video
+                                      src={absoluteMediaUrl(asset.url)}
+                                      controls
+                                      style={{ width: "100%", aspectRatio: "16 / 9", display: "block", background: "var(--surface-sunken)" }}
+                                    />
+                                  )}
+                                </div>
+                                <div className="stack-2">
+                                  <div className="row row-between">
+                                    <b>{asset.title}</b>
+                                    <div className="row">
+                                      {asset.status ? (
+                                        <span className={`badge ${assetStatusTone(asset.status)}`}>{asset.status}</span>
+                                      ) : null}
+                                      {asset.rating ? <span className="badge badge-warn">{asset.rating} 分</span> : null}
+                                    </div>
+                                  </div>
+                                  <div className="row">
+                                    <span className="badge">{asset.kind === "image" ? "主图" : "视频"}</span>
+                                    <span className="badge">V{asset.assetVersion}</span>
+                                  </div>
+                                  <p className="mono-note">
+                                    {asset.model || "model"} · {asset.size || "size"}
+                                    {asset.duration ? ` · ${asset.duration}s` : ""}
+                                  </p>
+                                  <div className="chip-row">
+                                    {asset.tags.map((tag) => (
+                                      <span key={tag} className="tag">{tag}</span>
+                                    ))}
+                                    {asset.usageContexts.map((context) => (
+                                      <span key={context} className="tag">使用场景：{context}</span>
+                                    ))}
+                                  </div>
+                                  {asset.note ? <p className="mono-note">备注：{asset.note}</p> : null}
+                                  <div className="row">
+                                    <a
+                                      href={absoluteMediaUrl(asset.url)}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="btn btn-sm"
+                                    >
+                                      <svg className="ic ic-sm" aria-hidden="true"><use href="#i-ext"></use></svg>打开素材
+                                    </a>
+                                  </div>
+                                  {canEdit ? (
+                                    <details className="boxed">
+                                      <summary>
+                                        <svg className="ic ic-sm" aria-hidden="true"><use href="#i-chev"></use></svg>评价素材
+                                      </summary>
+                                      <form
+                                        action={`/products/${product.id}/creative-plans/${asset.planId}/assets/update`}
+                                        method="post"
+                                        className="stack-3"
+                                        style={{ marginTop: "var(--sp-2)" }}
+                                      >
+                                        <input type="hidden" name="url" value={asset.url} />
+                                        <input type="hidden" name="asset_type" value={asset.kind} />
+                                        <div className="form-grid">
+                                          <div className="field">
+                                            <label htmlFor={`a-${asset.url}-rating`}>评分</label>
+                                            <input
+                                              className="input mono"
+                                              id={`a-${asset.url}-rating`}
+                                              name="rating"
+                                              type="number"
+                                              min="1"
+                                              max="5"
+                                              defaultValue={asset.rating ?? ""}
+                                            />
+                                          </div>
+                                          <div className="field">
+                                            <label htmlFor={`a-${asset.url}-status`}>状态</label>
+                                            <select
+                                              className="input"
+                                              id={`a-${asset.url}-status`}
+                                              name="status"
+                                              defaultValue={asset.status || "待评估"}
+                                            >
+                                              <option value="待评估">待评估</option>
+                                              <option value="通过">通过</option>
+                                              <option value="弃用">弃用</option>
+                                              <option value="复测">复测</option>
+                                            </select>
+                                          </div>
+                                          <div className="field">
+                                            <label htmlFor={`a-${asset.url}-version`}>素材版本</label>
+                                            <input
+                                              className="input mono"
+                                              id={`a-${asset.url}-version`}
+                                              name="asset_version"
+                                              type="number"
+                                              min="1"
+                                              defaultValue={asset.assetVersion}
+                                            />
+                                          </div>
+                                          <div className="field">
+                                            <label htmlFor={`a-${asset.url}-usage`}>使用场景</label>
+                                            <input
+                                              className="input"
+                                              id={`a-${asset.url}-usage`}
+                                              name="usage_contexts"
+                                              defaultValue={asset.usageContexts.join("，")}
+                                              placeholder="冷启动，人群测试，复测"
+                                            />
+                                          </div>
+                                        </div>
+                                        <div className="field">
+                                          <label htmlFor={`a-${asset.url}-tags`}>标签</label>
+                                          <input
+                                            className="input"
+                                            id={`a-${asset.url}-tags`}
+                                            name="tags"
+                                            defaultValue={asset.tags.join("，")}
+                                            placeholder="通勤，控油，高点击潜力"
+                                          />
+                                        </div>
+                                        <div className="field">
+                                          <label htmlFor={`a-${asset.url}-note`}>备注</label>
+                                          <textarea
+                                            className="input"
+                                            id={`a-${asset.url}-note`}
+                                            name="note"
+                                            defaultValue={asset.note}
+                                            rows={2}
+                                            placeholder="记录适合投放的人群、需要优化的问题或复盘观察"
+                                          />
+                                        </div>
+                                        <div className="row">
+                                          <button type="submit" className="btn btn-primary">保存评价</button>
+                                        </div>
+                                      </form>
+                                    </details>
+                                  ) : null}
+                                </div>
+                              </article>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="empty">
+                            <svg className="ic ic-lg" aria-hidden="true"><use href="#i-copy"></use></svg>
+                            <h4>还没有生成素材</h4>
+                            <p>素材来自主图方案与视频脚本。先生成方向（免费），确认角度后再出图出片，避免把钱花在错的方向上。</p>
+                            <div className="empty-actions">
+                              <Link className="btn btn-primary" href={`/products/${product.id}?tab=main-images`}>生成主图方案</Link>
+                              <Link className="btn" href={`/products/${product.id}?tab=video`}>生成视频脚本</Link>
+                            </div>
+                            <p className="empty-next">
+                              <svg className="ic ic-sm" aria-hidden="true"><use href="#i-chev"></use></svg>
+                              素材入库后可按版本 / 评分 / 标签管理，并挂上经营数据做效果归因
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              ) : null}
+
+              {activeTab === "jobs" ? (
+                <section className="sec" id="jobs" aria-labelledby="h-jobs">
+                  <div className="sec-hd">
+                    <div className="stack-2">
+                      <span className="eyebrow">SECTION 08 · TAB=JOBS · 任务</span>
+                      <h2 id="h-jobs">生成任务中心 · 公开链接解析任务</h2>
+                    </div>
+                    <span className="mono-note">GenerationJob（图片 / 视频）与 PublicLinkParseTask（竞品解析）分开管理；有活动任务时页面自动刷新</span>
+                  </div>
+
+                  <div className="stack-4">
+                    <div className="panel">
+                      <div className="panel-head">
+                        <div className="stack-2">
+                          <h3>生成任务中心</h3>
+                          <p className="mono-note">查看当前商品所有图片和视频生成任务，包括状态、结果、错误和重试入口</p>
+                        </div>
+                        <div className="row">
+                          {hasActiveGenerationJobs ? (
+                            <span className="badge badge-warn"><span className="status-led is-busy" aria-hidden="true"></span>自动刷新中</span>
+                          ) : null}
+                          <span className="badge">{product.generation_jobs.length} 个生成任务</span>
+                        </div>
+                      </div>
+
+                      {product.generation_jobs.length > 0 ? (
+                        <div className="tbl-wrap">
+                          <table className="tbl tbl-x">
+                            <caption className="sr-only">生成任务列表，共 {product.generation_jobs.length} 条</caption>
+                            <thead>
+                              <tr>
+                                <th scope="col">ID</th>
+                                <th scope="col">类型</th>
+                                <th scope="col">状态</th>
+                                <th scope="col" className="wrap-cell">结果 / 错误</th>
+                                <th scope="col" className="num">尝试</th>
+                                <th scope="col">时间</th>
+                                <th scope="col">操作</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {product.generation_jobs.map((job) => (
+                                <tr key={job.id}>
+                                  <td className="key">#{job.id}</td>
+                                  <td>{job.kind === "video_asset" ? "视频" : "图片"}</td>
+                                  <td><JobStatusBadge job={job} /></td>
+                                  <td>
+                                    {job.status === "succeeded" && jobResultUrl(job) ? (
+                                      <a
+                                        className="lnk"
+                                        href={absoluteMediaUrl(jobResultUrl(job) || "")}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                      >
+                                        <svg className="ic ic-sm" aria-hidden="true"><use href="#i-ext"></use></svg>打开生成结果
+                                      </a>
+                                    ) : job.error ? (
+                                      <span style={{ color: "var(--accent)" }}>{job.error}</span>
+                                    ) : (
+                                      <span className="mono-note">
+                                        {job.started_at ? `开始于 ${formatDateTime(job.started_at)}` : "等待后台执行"}
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="num">{job.attempts} / {job.max_attempts}</td>
+                                  <td className="key">{job.created_at ? formatDateTime(job.created_at) : "—"}</td>
+                                  <td>
+                                    <div className="actions">
+                                      <Link className="btn btn-sm" href={`/products/${product.id}/generation-jobs/${job.id}`}>详情</Link>
+                                      {canEdit && job.status === "failed" ? (
+                                        <form action={`/products/${product.id}/generation-jobs/${job.id}/retry`} method="post">
+                                          <input type="hidden" name="tab" value="jobs" />
+                                          <button type="submit" className="btn btn-sm btn-primary">重试</button>
+                                        </form>
+                                      ) : canEdit && (job.status === "pending" || job.status === "running") ? (
+                                        <form action={`/products/${product.id}/generation-jobs/${job.id}/cancel`} method="post">
+                                          <input type="hidden" name="tab" value="jobs" />
+                                          <button type="submit" className="btn btn-sm">取消</button>
+                                        </form>
+                                      ) : null}
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="panel-body">
+                          <div className="empty">
+                            <svg className="ic ic-lg" aria-hidden="true"><use href="#i-terminal"></use></svg>
+                            <h4>还没有生成任务</h4>
+                            <p>生成任务由创意方案触发。每张图 / 每条视频都会留下任务记录，失败可重试，取消不留费用。</p>
+                            <div className="empty-actions">
+                              <Link className="btn btn-primary" href={`/products/${product.id}?tab=main-images`}>去主图页签出图</Link>
+                            </div>
+                            <p className="empty-next">
+                              <svg className="ic ic-sm" aria-hidden="true"><use href="#i-chev"></use></svg>
+                              出任务后这里按状态分组：排队中 · 生成中 · 已完成 · 失败 · 已取消
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      {product.generation_jobs.length > 0 ? (
+                        <div className="tbl-note">
+                          <svg className="ic ic-sm" aria-hidden="true"><use href="#i-warn"></use></svg>
+                          <span>三态动作规则：进行中 / 排队中只给「取消」；已完成给「打开结果」；失败给「重试」并显示尝试次数与错误原文。</span>
+                        </div>
                       ) : null}
                     </div>
-                    {generatedImages(plan.content).length > 0 ? (
-                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                        {generatedImages(plan.content).map((image) => (
-                          <a
-                            key={image.url}
-                            href={absoluteImageUrl(image.url)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="group overflow-hidden rounded-md border border-slate-200 bg-slate-50"
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={absoluteImageUrl(image.url)}
-                              alt={`${plan.title} 图片草稿`}
-                              className="aspect-square w-full object-cover transition group-hover:scale-[1.02]"
-                            />
-                            <div className="px-3 py-2 text-xs text-slate-500">
-                              {image.model || "image model"} · {image.size || "image"}
-                            </div>
-                          </a>
-                        ))}
+
+                    <div className="panel">
+                      <div className="panel-head">
+                        <div className="stack-2">
+                          <h3>公开链接解析任务</h3>
+                          <p className="mono-note">把用户提交的公开商品页异步解析成竞品档案，最多重试 3 次</p>
+                        </div>
+                        <span className="badge">{product.public_link_parse_tasks.length} 个任务</span>
                       </div>
-                    ) : (
-                      <div className="mt-3 rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">
-                        还没有图片草稿。确认提示词后可先生成 1 张测试图。
-                      </div>
-                    )}
-                    <JobError job={latestJob(product.generation_jobs, plan.id, "main_image_asset")} />
+                      {product.public_link_parse_tasks.length > 0 ? (
+                        <div className="tbl-wrap">
+                          <table className="tbl tbl-x">
+                            <caption className="sr-only">公开链接解析任务，共 {product.public_link_parse_tasks.length} 条</caption>
+                            <thead>
+                              <tr>
+                                <th scope="col">ID</th>
+                                <th scope="col">状态</th>
+                                <th scope="col" className="wrap-cell">链接</th>
+                                <th scope="col" className="wrap-cell">结果 / 错误</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {product.public_link_parse_tasks.map((task) => (
+                                <tr key={task.id}>
+                                  <td className="key">#{task.id}</td>
+                                  <td><LinkParseTaskStatusBadge status={task.status} /></td>
+                                  <td className="url">
+                                    <a href={task.url} target="_blank" rel="noreferrer" className="lnk">{task.url}</a>
+                                  </td>
+                                  <td>
+                                    {task.error ? (
+                                      <span style={{ color: "var(--accent)" }}>{task.error}</span>
+                                    ) : task.result.competitor_id ? (
+                                      <span>已生成竞品 #{String(task.result.competitor_id)}</span>
+                                    ) : (
+                                      <span className="mono-note">
+                                        {task.next_run_at ? `等待执行：${formatDateTime(task.next_run_at)}` : "等待后台调度"}
+                                      </span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="panel-body">
+                          <div className="empty">
+                            <svg className="ic ic-lg" aria-hidden="true"><use href="#i-search"></use></svg>
+                            <h4>还没有公开链接解析任务</h4>
+                            <p>在概览页签提交竞品链接后，这里会显示解析进度与结果，失败可重试 3 次。</p>
+                            <p className="empty-next">
+                              <svg className="ic ic-sm" aria-hidden="true"><use href="#i-chev"></use></svg>
+                              解析成功会自动生成竞品档案；失败时给出错误原文
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </section>
+              ) : null}
+
+              {activeTab === "video" ? (
+                <section className="sec" id="video" aria-labelledby="h-video">
+                  <div className="sec-hd">
+                    <div className="stack-2">
+                      <span className="eyebrow">SECTION 04 · TAB=VIDEO · 短视频脚本</span>
+                      <h2 id="h-video">脚本方向 → 视频草稿 → 素材入库</h2>
+                    </div>
+                    <span className="mono-note">先生成可拍摄脚本，后续再接视频生成或达人协作流程</span>
                   </div>
 
-                  {canEdit ? (
-                    <details className="mt-4 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-                    <summary className="cursor-pointer text-sm font-medium text-slate-700">
-                      编辑方案
-                    </summary>
-                      <MainImagePlanEditForm productId={product.id} plan={plan} />
-                    </details>
-                  ) : null}
-                </div>
-              ))}
+                  <div className="stack-4">
+                    <div className="panel">
+                      <div className="panel-head">
+                        <h3>短视频脚本</h3>
+                        <div className="row">
+                          <span className="badge">{videoScripts.length > 0 ? `最近 ${videoScripts.length} 条脚本` : "待生成"}</span>
+                          {canEdit ? (
+                            <form action={`/products/${product.id}/creative-plans/video-scripts/generate`} method="post">
+                              <button type="submit" className="btn btn-primary">
+                                <svg className="ic ic-sm" aria-hidden="true"><use href="#i-terminal"></use></svg>生成脚本
+                              </button>
+                            </form>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="panel-body stack-4">
+                        {videoScripts.length === 0 ? (
+                          <div className="empty">
+                            <svg className="ic ic-lg" aria-hidden="true"><use href="#i-terminal"></use></svg>
+                            <h4>还没有短视频脚本</h4>
+                            <p>建议先有诊断和主图方向后再生成。脚本包含开头钩子、分镜、口播与转化引导，可人工编辑。</p>
+                            <p className="empty-next">
+                              <svg className="ic ic-sm" aria-hidden="true"><use href="#i-chev"></use></svg>
+                              生成后这里出现：脚本方向 · 钩子 · 分镜表 · 视频草稿任务
+                            </p>
+                          </div>
+                        ) : (
+                          videoScripts.map((script) => (
+                            <div key={script.id} className="panel">
+                              <div className="panel-head">
+                                <div className="stack-2">
+                                  <h3>{script.title}</h3>
+                                  <p className="mono-note">{planText(script.content, "angle")}</p>
+                                </div>
+                                <div className="row">
+                                  <span className="badge badge-info">{planValue(script.content, "duration_seconds")}s</span>
+                                  <CreativePlanStatusActions productId={product.id} plan={script} tab="video" canEdit={canEdit} />
+                                </div>
+                              </div>
+                              <div className="panel-body stack-4">
+                                <div className="tint tint-info">
+                                  <span className="tint-lbl">开头钩子</span>
+                                  <p>{planText(script.content, "hook")}</p>
+                                </div>
+
+                                <div className="tbl-wrap">
+                                  <table className="tbl tbl-l">
+                                    <caption className="sr-only">分镜表，共 {planScenes(script.content).length} 镜</caption>
+                                    <thead>
+                                      <tr><th scope="col">镜头</th><th scope="col">画面</th><th scope="col">口播</th></tr>
+                                    </thead>
+                                    <tbody>
+                                      {planScenes(script.content).map((scene) => (
+                                        <tr key={`${script.id}-${scene.shot}`}>
+                                          <td className="key">{scene.shot}</td>
+                                          <td>{scene.visual}</td>
+                                          <td>{scene.voiceover}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+
+                                <div className="grid-2">
+                                  <div>
+                                    <span className="eyebrow">卖点证明</span>
+                                    <div className="chip-row" style={{ marginTop: ".5rem" }}>
+                                      {planList(script.content, "selling_point_proof").map((point) => (
+                                        <span key={point} className="tag">{point}</span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <PlanField label="转化引导" value={planText(script.content, "cta")} highlight />
+                                </div>
+
+                                <div className="stack-2">
+                                  <div className="row row-between">
+                                    <span className="eyebrow">视频草稿</span>
+                                    <div className="row">
+                                      <JobStatusBadge job={latestJob(product.generation_jobs, script.id, "video_asset")} />
+                                      {canEdit ? (
+                                        <form action={`/products/${product.id}/creative-plans/${script.id}/videos/generate`} method="post">
+                                          <button type="submit" className="btn btn-sm">
+                                            <svg className="ic ic-sm" aria-hidden="true"><use href="#i-terminal"></use></svg>生成视频草稿
+                                          </button>
+                                        </form>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                  {generatedVideos(script.content).length > 0 ? (
+                                    <div className="grid-2">
+                                      {generatedVideos(script.content).map((video) => (
+                                        <div key={video.url} className="asset">
+                                          <div className="asset-fig">
+                                            <video
+                                              src={absoluteMediaUrl(video.url)}
+                                              controls
+                                              style={{ width: "100%", aspectRatio: "16 / 9", display: "block", background: "var(--surface-sunken)" }}
+                                            />
+                                          </div>
+                                          <p className="mono-note">
+                                            {video.model || "video model"} · {video.size || "video"} · {video.duration || "-"}s
+                                          </p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div className="empty" style={{ padding: "var(--sp-5)" }}>
+                                      <svg className="ic ic-lg" aria-hidden="true"><use href="#i-copy"></use></svg>
+                                      <h4>还没有视频草稿</h4>
+                                      <p>确认脚本后可先生成 1 条测试视频，评估开头钩子与画面识别度后再批量出片。</p>
+                                      <p className="empty-next">
+                                        <svg className="ic ic-sm" aria-hidden="true"><use href="#i-chev"></use></svg>
+                                        生成完成后，这里会出现结果视频、模型与时长
+                                      </p>
+                                    </div>
+                                  )}
+                                  <JobError job={latestJob(product.generation_jobs, script.id, "video_asset")} />
+                                </div>
+
+                                {canEdit ? (
+                                  <details className="boxed">
+                                    <summary>
+                                      <svg className="ic ic-sm" aria-hidden="true"><use href="#i-chev"></use></svg>
+                                      编辑脚本（钩子 / 分镜 / 口播 / 转化引导）
+                                    </summary>
+                                    <div className="stack-3" style={{ marginTop: "var(--sp-2)" }}>
+                                      <VideoScriptEditForm productId={product.id} script={script} />
+                                    </div>
+                                  </details>
+                                ) : null}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              ) : null}
+
+              {activeTab === "main-images" ? (
+                <section className="sec" id="creative" aria-labelledby="h-creative">
+                  <div className="sec-hd">
+                    <div className="stack-2">
+                      <span className="eyebrow">SECTION 04 · TAB=MAIN-IMAGES · 主图方案</span>
+                      <h2 id="h-creative">方案方向 → 生成任务三态 → 结果入库</h2>
+                    </div>
+                    <span className="mono-note">CreativePlan（方向）与 GenerationJob（生成）是两层：方向可编辑，任务可取消 / 重试</span>
+                  </div>
+
+                  <div className="stack-4">
+                    <div className="panel">
+                      <div className="panel-head">
+                        <h3>主图方案</h3>
+                        <div className="row">
+                          <span className="badge">{mainImagePlans.length > 0 ? `最近 ${mainImagePlans.length} 个方案` : "待生成"}</span>
+                          {canEdit ? (
+                            <form action={`/products/${product.id}/creative-plans/main-images/generate`} method="post">
+                              <button type="submit" className="btn btn-primary">
+                                <svg className="ic ic-sm" aria-hidden="true"><use href="#i-copy"></use></svg>生成主图
+                              </button>
+                            </form>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="panel-body stack-4">
+                        {mainImagePlans.length === 0 ? (
+                          <div className="empty">
+                            <svg className="ic ic-lg" aria-hidden="true"><use href="#i-copy"></use></svg>
+                            <h4>还没有主图方案</h4>
+                            <p>建议先生成诊断，再点击「生成主图」。方案方向是免费的，确认角度后再出图，避免把钱花在错的方向上。</p>
+                            <p className="empty-next">
+                              <svg className="ic ic-sm" aria-hidden="true"><use href="#i-chev"></use></svg>
+                              生成后这里出现：方案方向 · 主副文案 · 画面布局 · 图片草稿任务
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="grid-2">
+                            {mainImagePlans.map((plan) => (
+                              <div key={plan.id} className="panel">
+                                <div className="panel-head">
+                                  <div className="stack-2">
+                                    <h3>{plan.title}</h3>
+                                    <p className="mono-note">main_image · {planText(plan.content, "angle")}</p>
+                                  </div>
+                                  <CreativePlanStatusActions productId={product.id} plan={plan} tab="main-images" canEdit={canEdit} />
+                                </div>
+                                <div className="panel-body stack-4">
+                                  <PlanField label="主文案" value={planText(plan.content, "headline")} highlight />
+                                  <PlanField label="副文案" value={planText(plan.content, "sub_headline")} />
+                                  <PlanField label="画面布局" value={planText(plan.content, "layout")} />
+                                  <PlanField label="视觉重点" value={planText(plan.content, "visual_focus")} />
+
+                                  <div>
+                                    <span className="eyebrow">证明点</span>
+                                    <div className="chip-row" style={{ marginTop: ".5rem" }}>
+                                      {planList(plan.content, "proof_points").map((point) => (
+                                        <span key={point} className="tag">{point}</span>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  <div className="stack-2">
+                                    <div className="row row-between">
+                                      <span className="eyebrow">图片草稿</span>
+                                      <div className="row">
+                                        <JobStatusBadge job={latestJob(product.generation_jobs, plan.id, "main_image_asset")} />
+                                        {canEdit ? (
+                                          <form action={`/products/${product.id}/creative-plans/${plan.id}/images/generate`} method="post">
+                                            <button type="submit" className="btn btn-sm">
+                                              <svg className="ic ic-sm" aria-hidden="true"><use href="#i-copy"></use></svg>生成图片草稿
+                                            </button>
+                                          </form>
+                                        ) : null}
+                                      </div>
+                                    </div>
+                                    {generatedImages(plan.content).length > 0 ? (
+                                      <div className="grid-2">
+                                        {generatedImages(plan.content).map((image) => (
+                                          <a
+                                            key={image.url}
+                                            href={absoluteImageUrl(image.url)}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="asset-fig"
+                                          >
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img
+                                              src={absoluteImageUrl(image.url)}
+                                              alt={`${plan.title} 图片草稿`}
+                                              style={{ width: "100%", aspectRatio: "1 / 1", objectFit: "cover", display: "block" }}
+                                            />
+                                            <p className="mono-note" style={{ padding: "var(--sp-2) var(--sp-3)" }}>
+                                              {image.model || "image model"} · {image.size || "image"}
+                                            </p>
+                                          </a>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <div className="empty" style={{ padding: "var(--sp-5)" }}>
+                                        <svg className="ic ic-lg" aria-hidden="true"><use href="#i-copy"></use></svg>
+                                        <h4>还没有图片草稿</h4>
+                                        <p>方案方向已确认，但未生成图片。先生成 1 张测试图，评估构图与识别度后再批量出图。</p>
+                                        <p className="empty-next">
+                                          <svg className="ic ic-sm" aria-hidden="true"><use href="#i-chev"></use></svg>
+                                          生成完成后，这里会出现结果缩略图、模型与尺寸
+                                        </p>
+                                      </div>
+                                    )}
+                                    <JobError job={latestJob(product.generation_jobs, plan.id, "main_image_asset")} />
+                                  </div>
+
+                                  {canEdit ? (
+                                    <details className="boxed">
+                                      <summary>
+                                        <svg className="ic ic-sm" aria-hidden="true"><use href="#i-chev"></use></svg>编辑方案
+                                      </summary>
+                                      <div className="stack-3" style={{ marginTop: "var(--sp-2)" }}>
+                                        <MainImagePlanEditForm productId={product.id} plan={plan} />
+                                      </div>
+                                    </details>
+                                  ) : null}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              ) : null}
+
             </div>
-          )}
-        </section>
-        ) : null}
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+/** 渲染顶栏组件，集中展示品牌、主导航与主题切换入口。 */
+function ProductTopBar() {
+  return (
+    <header className="app-top">
+      <Link className="brand" href="/">
+        <svg className="mark ic-lg" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+          <rect x="12" y="12" width="8" height="8" rx="2" />
+          <rect x="4" y="4" width="4" height="4" rx="1" />
+          <rect x="24" y="4" width="4" height="4" rx="1" />
+          <rect x="4" y="24" width="4" height="4" rx="1" />
+          <rect x="24" y="24" width="4" height="4" rx="1" />
+        </svg>
+        <span>运营智能体</span>
+        <span className="sub">PRODUCTS</span>
+      </Link>
+      <nav aria-label="主导航">
+        <Link href="/">工作台</Link>
+        <Link href="/imports">导入中心</Link>
+        <Link href="/settings">模型配置</Link>
+        <Link href="/agent">Agent 中心</Link>
+      </nav>
+      <div className="app-top-actions">
+        <span className="badge badge-online"><span className="status-led" aria-hidden="true"></span>服务在线</span>
+        <button type="button" className="btn btn-ghost btn-sm" id="themeBtn" aria-label="切换明暗主题">
+          <svg className="ic ic-sm" aria-hidden="true"><use href="#i-chev"></use></svg>
+          <span>主题</span>
+        </button>
       </div>
-    </main>
+    </header>
+  );
+}
+
+/** 渲染库存流水行组件，展示 InventoryMovement 五类型（inbound / outbound / adjustment / lock / release）。 */
+function InventoryMovementRow({ movement }: { movement: InventoryMovement }) {
+  const typeLabels: Record<InventoryMovement["movement_type"], string> = {
+    inbound: "入库",
+    outbound: "出库",
+    adjustment: "调整",
+    lock: "锁定",
+    release: "释放",
+  };
+  const typeTones: Record<InventoryMovement["movement_type"], string> = {
+    inbound: "badge badge-online",
+    outbound: "badge badge-info",
+    adjustment: "badge badge-warn",
+    lock: "badge",
+    release: "badge",
+  };
+  return (
+    <tr>
+      <td className="key">{formatDateTime(movement.created_at)}</td>
+      <td><span className={typeTones[movement.movement_type]}>{typeLabels[movement.movement_type]}</span></td>
+      <td className="num">{movement.quantity_delta > 0 ? `+${movement.quantity_delta}` : movement.quantity_delta}（{movement.before_quantity} → {movement.after_quantity}）</td>
+      <td className="num">{movement.locked_delta > 0 ? `+${movement.locked_delta}` : movement.locked_delta}（{movement.before_locked_quantity} → {movement.after_locked_quantity}）</td>
+      <td>{movement.reason ?? <span className="mono-note">未填写</span>}</td>
+      <td>{movement.operator_name ?? <span className="mono-note">系统</span>}</td>
+    </tr>
   );
 }
 
@@ -1369,24 +2076,19 @@ function ProductTabNav({
   activeTab: ProductTabKey;
 }) {
   return (
-    <nav className="overflow-x-auto border-b border-slate-200" aria-label="商品运营工作区">
-      <div className="flex min-w-max gap-1">
-        {productTabs.map((tab) => {
-          const isActive = tab.key === activeTab;
-          return (
-            <Link
-              key={tab.key}
-              href={`/products/${productId}?tab=${tab.key}`}
-              className={`inline-flex h-11 items-center border-b-2 px-4 text-sm font-medium transition ${
-                isActive
-                  ? "border-slate-950 text-slate-950"
-                  : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800"
-              }`}
-            >
-              {tab.label}
-            </Link>
-          );
-        })}
+    <nav className="subnav" aria-label="商品运营工作区">
+      <div className="tabs" role="tablist">
+        {productTabs.map((tab) => (
+          <Link
+            key={tab.key}
+            role="tab"
+            href={`/products/${productId}?tab=${tab.key}`}
+            className="tab"
+            aria-selected={tab.key === activeTab ? "true" : "false"}
+          >
+            {tab.label}
+          </Link>
+        ))}
       </div>
     </nav>
   );
@@ -1409,47 +2111,28 @@ function ProductWorkflowPanel({
   const nextStep = steps.find((step) => !step.done) ?? steps[steps.length - 1];
 
   return (
-    <section className="rounded-md border border-slate-200 bg-white p-4">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-cyan-700 text-white">
-            <ClipboardList className="h-5 w-5" aria-hidden="true" />
-          </div>
-          <div>
-            <h2 className="text-sm font-semibold text-slate-950">单品运营流程</h2>
-            <p className="mt-1 text-sm text-slate-500">{nextStep.done ? "当前商品已跑通主要闭环。" : `下一步：${nextStep.title}`}</p>
-          </div>
-        </div>
-        <Link
-          href={nextStep.href}
-          className="inline-flex h-9 w-fit items-center gap-2 rounded-md bg-slate-950 px-3 text-sm font-medium text-white hover:bg-slate-800"
-        >
-          {nextStep.done ? "查看复盘" : "继续处理"}
-          <ArrowRight className="h-4 w-4" aria-hidden="true" />
-        </Link>
+    <section className="stack-3" aria-label="单品运营流程">
+      <div className="row row-between">
+        <h2 className="t-h2">单品运营流程</h2>
+        <span className="mono-note">
+          依数据判定 done；{nextStep.done ? "当前商品已跑通主要闭环" : `nextStep = ${nextStep.title}`}
+        </span>
       </div>
-
-      <div className="mt-4 grid gap-2 lg:grid-cols-4">
-        {steps.map((step) => (
-          <Link
-            key={step.key}
-            href={step.href}
-            className={`rounded-md border px-3 py-3 transition ${
-              step.done ? "border-emerald-100 bg-emerald-50" : "border-slate-200 bg-white hover:bg-slate-50"
-            }`}
-          >
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-medium text-slate-950">{step.title}</p>
-              {step.done ? (
-                <CheckCircle2 className="h-4 w-4 text-emerald-700" aria-hidden="true" />
-              ) : (
-                <span className="h-2 w-2 rounded-full bg-amber-500" aria-hidden="true" />
-              )}
-            </div>
-            <p className="mt-2 text-xs leading-5 text-slate-500">{step.hint}</p>
-          </Link>
+      <ol className="flow flow-7" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+        {steps.map((step, index) => (
+          <li key={step.key} className={`flow-step ${step.done ? "is-done" : step === nextStep ? "is-next" : "is-idle"}`}>
+            <span className="flow-idx">STEP {String(index + 1).padStart(2, "0")}</span>
+            <Link href={step.href}>
+              <h3>{step.title}</h3>
+              <p>{step.hint}</p>
+              <span className="flow-mark">
+                <svg className="ic ic-sm" aria-hidden="true"><use href={step.done ? "#i-check" : step === nextStep ? "#i-arrow-r" : "#i-chev"}></use></svg>
+                {step.done ? "已完成" : step === nextStep ? "当前步骤" : "未开始"}
+              </span>
+            </Link>
+          </li>
         ))}
-      </div>
+      </ol>
     </section>
   );
 }
@@ -1521,27 +2204,21 @@ function buildProductWorkflowSteps(product: ProductDetail): ProductWorkflowStep[
 function DiagnosisList({
   title,
   items,
-  accent = false,
+  tone = "default",
 }: {
   title: string;
   items: string[];
-  accent?: boolean;
+  tone?: "default" | "warn" | "accent";
 }) {
+  const toneClass = tone === "warn" ? "tint tint-warn" : tone === "accent" ? "tint tint-accent" : "tint";
   return (
-    <div className="rounded-md border border-slate-200 p-4">
-      <p className="text-sm font-semibold text-slate-950">{title}</p>
-      <div className="mt-3 space-y-2">
+    <div className={toneClass}>
+      <span className="tint-lbl">{title}</span>
+      <ul className="stack-2">
         {items.map((item) => (
-          <p
-            key={item}
-            className={`rounded-md px-3 py-2 text-sm leading-6 ${
-              accent ? "bg-emerald-50 text-emerald-800" : "bg-slate-50 text-slate-700"
-            }`}
-          >
-            {item}
-          </p>
+          <li key={item}>{item}</li>
         ))}
-      </div>
+      </ul>
     </div>
   );
 }
@@ -1550,86 +2227,50 @@ function DiagnosisList({
 function ReviewList({
   title,
   items,
-  accent = false,
+  tone = "default",
 }: {
   title: string;
   items: string[];
-  accent?: boolean;
+  tone?: "default" | "warn" | "accent";
 }) {
-  return (
-    <div className="rounded-md border border-slate-200 p-4">
-      <p className="text-sm font-semibold text-slate-950">{title}</p>
-      <div className="mt-3 space-y-2">
-        {items.map((item) => (
-          <p
-            key={item}
-            className={`rounded-md px-3 py-2 text-sm leading-6 ${
-              accent ? "bg-amber-50 text-amber-800" : "bg-slate-50 text-slate-700"
-            }`}
-          >
-            {item}
-          </p>
-        ))}
-      </div>
-    </div>
-  );
+  return <DiagnosisList title={title} items={items} tone={tone} />;
 }
 
 /** 渲染 AdTextList 组件，集中展示投放文本列表所需的数据、状态和操作入口。 */
 function AdTextList({
   title,
   items,
-  accent = false,
+  tone = "default",
 }: {
   title: string;
   items: string[];
-  accent?: boolean;
+  tone?: "default" | "warn" | "accent";
 }) {
-  return (
-    <div className="rounded-md border border-slate-200 p-4">
-      <p className="text-sm font-semibold text-slate-950">{title}</p>
-      <div className="mt-3 space-y-2">
-        {items.map((item) => (
-          <p
-            key={item}
-            className={`rounded-md px-3 py-2 text-sm leading-6 ${
-              accent ? "bg-emerald-50 text-emerald-800" : "bg-slate-50 text-slate-700"
-            }`}
-          >
-            {item}
-          </p>
-        ))}
-      </div>
-    </div>
-  );
+  return <DiagnosisList title={title} items={items} tone={tone} />;
 }
 
 /** 渲染 AdObjectList 组件，集中展示投放对象列表所需的数据、状态和操作入口。 */
 function AdObjectList({ title, items }: { title: string; items: Record<string, unknown>[] }) {
   return (
-    <div className="rounded-md border border-slate-200 p-4">
-      <p className="text-sm font-semibold text-slate-950">{title}</p>
-      <div className="mt-3 space-y-3">
+    <div className="panel">
+      <div className="panel-head"><h3>{title}</h3><span className="badge">{items.length} 条</span></div>
+      <div className="panel-body stack-3">
         {items.map((item, index) => (
-          <div key={`${title}-${index}`} className="rounded-md bg-slate-50 px-3 py-3">
-            <p className="text-sm font-medium text-slate-900">
-              {contentObjectText(item, "name") || `方案 ${index + 1}`}
-            </p>
-            <p className="mt-1 text-sm leading-6 text-slate-600">
+          <div key={`${title}-${index}`} className="tint">
+            <span className="tint-lbl">{contentObjectText(item, "name") || `方案 ${index + 1}`}</span>
+            <p>
               {contentObjectText(item, "rationale") ||
                 contentObjectText(item, "hypothesis") ||
                 contentObjectText(item, "asset_direction")}
             </p>
-            <div className="mt-2 flex flex-wrap gap-1.5">
+            <div className="chip-row" style={{ marginTop: ".5rem" }}>
               {[
                 ...contentObjectList(item, "targeting"),
                 contentObjectText(item, "success_metric"),
               ]
                 .filter(Boolean)
                 .map((value) => (
-                  <span key={value} className="rounded-md bg-white px-2 py-1 text-xs text-slate-600">
-                    {value}
-                  </span>
+                  <span key={value} className="tag">{value}</span>
                 ))}
             </div>
           </div>
@@ -1644,20 +2285,27 @@ function BudgetPlan({ content }: { content: Record<string, unknown> }) {
   const value = content.budget_plan;
   const budget = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
   return (
-    <div className="rounded-md border border-slate-200 p-4">
-      <p className="text-sm font-semibold text-slate-950">预算计划</p>
-      <div className="mt-3 space-y-2">
-        <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm leading-6 text-emerald-800">
-          {contentObjectText(budget, "daily_budget") || "先用小预算测试。"}
-        </p>
-        {contentObjectList(budget, "allocation").map((item) => (
-          <p key={item} className="rounded-md bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-700">
-            {item}
-          </p>
-        ))}
-        <p className="rounded-md bg-rose-50 px-3 py-2 text-sm leading-6 text-rose-800">
-          {contentObjectText(budget, "stop_loss_rule") || "到达止损线及时暂停。"}
-        </p>
+    <div className="panel">
+      <div className="panel-head"><h3>预算计划</h3><span className="badge badge-warn">止损线明确</span></div>
+      <div className="panel-body stack-3">
+        <div className="tint tint-ok">
+          <span className="tint-lbl">日预算</span>
+          <p>{contentObjectText(budget, "daily_budget") || "先用小预算测试。"}</p>
+        </div>
+        {contentObjectList(budget, "allocation").length > 0 ? (
+          <div className="tint">
+            <span className="tint-lbl">分配</span>
+            <ul className="stack-2">
+              {contentObjectList(budget, "allocation").map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        <div className="tint tint-warn">
+          <span className="tint-lbl">止损规则</span>
+          <p>{contentObjectText(budget, "stop_loss_rule") || "到达止损线及时暂停。"}</p>
+        </div>
       </div>
     </div>
   );
@@ -1667,90 +2315,49 @@ function BudgetPlan({ content }: { content: Record<string, unknown> }) {
 function PromotionLinkCreateForm({ canEdit, productId }: { canEdit: boolean; productId: number }) {
   if (!canEdit) {
     return (
-      <div>
-        <h2 className="text-base font-semibold text-slate-950">手动添加链接</h2>
-        <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          当前账号为只读权限，不能添加推荐链接。
-        </p>
+      <div className="panel-body">
+        <div className="alert alert-warn" style={{ gridTemplateColumns: "18px minmax(0,1fr)" }}>
+          <svg className="ic" aria-hidden="true"><use href="#i-warn"></use></svg>
+          <span><b className="h">当前账号为只读权限</b> —— 不能添加推荐链接。</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <form action={`/products/${productId}/promotion-links/create`} method="post" className="space-y-4">
-      <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-md bg-sky-600 text-white">
-          <ExternalLink className="h-4 w-4" aria-hidden="true" />
-        </div>
-        <div>
-          <h2 className="text-base font-semibold text-slate-950">手动添加链接</h2>
-          <p className="text-sm text-slate-500">保存平台商品链接、达人链接或活动页链接</p>
-        </div>
+    <form action={`/products/${productId}/promotion-links/create`} method="post" className="panel-body stack-4">
+      <div className="field">
+        <label htmlFor="pl-label">链接名称</label>
+        <input className="input" id="pl-label" name="label" required placeholder="例如：6月短视频A组链接" />
       </div>
-
-      <label className="block">
-        <span className="text-sm font-medium text-slate-700">链接名称</span>
-        <input
-          name="label"
-          required
-          className="mt-2 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
-          placeholder="例如：6月短视频A组链接"
-        />
-      </label>
-
-      <label className="block">
-        <span className="text-sm font-medium text-slate-700">URL</span>
-        <input
-          name="url"
-          required
-          type="url"
-          className="mt-2 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
-          placeholder="https://..."
-        />
-      </label>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="block">
-          <span className="text-sm font-medium text-slate-700">类型</span>
-          <select
-            name="link_type"
-            defaultValue="landing"
-            className="mt-2 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
-          >
+      <div className="field">
+        <label htmlFor="pl-url">URL</label>
+        <input className="input mono" id="pl-url" name="url" required type="url" placeholder="https://..." />
+      </div>
+      <div className="form-grid">
+        <div className="field">
+          <label htmlFor="pl-type">类型</label>
+          <select className="input" id="pl-type" name="link_type" defaultValue="landing">
             <option value="landing">承接页</option>
             <option value="tracking">投放追踪</option>
             <option value="affiliate">达人/分销</option>
             <option value="activity">活动页</option>
           </select>
-        </label>
-
-        <label className="block">
-          <span className="text-sm font-medium text-slate-700">场景</span>
-          <input
-            name="scenario"
-            className="mt-2 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
-            placeholder="短视频投放"
-          />
-        </label>
+        </div>
+        <div className="field">
+          <label htmlFor="pl-scene">场景</label>
+          <input className="input" id="pl-scene" name="scenario" placeholder="短视频投放" />
+        </div>
       </div>
-
-      <label className="block">
-        <span className="text-sm font-medium text-slate-700">备注</span>
-        <textarea
-          name="note"
-          rows={3}
-          className="mt-2 w-full resize-y rounded-md border border-slate-200 bg-white px-3 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
-          placeholder="记录链接来源、投放人群、素材版本或活动周期"
-        />
-      </label>
-
-      <button
-        type="submit"
-        className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800"
-      >
-        <ExternalLink className="h-4 w-4" aria-hidden="true" />
-        保存链接
-      </button>
+      <div className="field">
+        <label htmlFor="pl-note">备注</label>
+        <textarea className="input" id="pl-note" name="note" rows={3} placeholder="记录链接来源、投放人群、素材版本或活动周期" />
+      </div>
+      <div className="row">
+        <button type="submit" className="btn btn-primary">
+          <svg className="ic ic-sm" aria-hidden="true"><use href="#i-ext"></use></svg>保存链接
+        </button>
+      </div>
     </form>
   );
 }
@@ -1759,16 +2366,20 @@ function PromotionLinkCreateForm({ canEdit, productId }: { canEdit: boolean; pro
 function AssetsSyncAlert({ status }: { status?: string }) {
   if (status === "synced") {
     return (
-      <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-        已同步历史素材到独立资产表。
+      <div className="alert alert-ok">
+        <svg className="ic" aria-hidden="true"><use href="#i-check"></use></svg>
+        <span>已同步历史素材到独立资产表。</span>
+        <span className="badge badge-online">synced</span>
       </div>
     );
   }
 
   if (status === "sync_failed") {
     return (
-      <div className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-        历史素材同步失败，请稍后重试。
+      <div className="alert alert-fail">
+        <svg className="ic" aria-hidden="true"><use href="#i-warn"></use></svg>
+        <span>历史素材同步失败，请稍后重试。</span>
+        <span className="badge badge-accent">failed</span>
       </div>
     );
   }
@@ -1791,40 +2402,48 @@ function AssetAttributionPanel({
   }
 
   return (
-    <div className="mb-5 rounded-md border border-slate-200 bg-slate-50 p-4">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h2 className="text-sm font-semibold text-slate-950">素材效果归因</h2>
-          <p className="mt-1 text-xs text-slate-500">按经营数据中关联的生成素材汇总点击、成交、CTR 和 ROI</p>
+    <div className="panel">
+      <div className="panel-head">
+        <div className="stack-2">
+          <h3>素材效果归因</h3>
+          <p className="mono-note">按经营数据中关联的生成素材汇总点击、成交、CTR 和 ROI</p>
         </div>
-        <span className="w-fit rounded-md bg-white px-2.5 py-1 text-xs text-slate-600">
-          {rows.filter((row) => row.recordCount > 0).length} 个有数据
-        </span>
+        <span className="badge">{rows.filter((row) => row.recordCount > 0).length} 个有数据</span>
       </div>
-
-      <div className="mt-4 grid gap-3">
-        {rows.slice(0, 5).map((row) => (
-          <div key={row.asset.id} className="rounded-md border border-slate-200 bg-white px-3 py-3">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-semibold text-slate-950">{row.asset.title || "生成素材"}</p>
-                <p className="mt-1 text-xs text-slate-500">
-                  {row.asset.asset_type === "video" ? "视频" : "图片"} · {row.asset.model || "model"}
-                </p>
-              </div>
-              <span className="w-fit rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600">
-                {row.recordCount} 条数据
-              </span>
-            </div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-5">
-              <InsightMetric label="点击" value={formatInteger(row.clicks)} />
-              <InsightMetric label="成交" value={formatInteger(row.conversions)} />
-              <InsightMetric label="CTR" value={formatNumberPercent(row.ctr)} />
-              <InsightMetric label="花费" value={formatNumberMoney(row.spend)} />
-              <InsightMetric label="ROI" value={formatNumberDecimal(row.roi)} />
-            </div>
-          </div>
-        ))}
+      <div className="tbl-wrap">
+        <table className="tbl tbl-x">
+          <caption className="sr-only">素材效果归因，共 {rows.length} 条</caption>
+          <thead>
+            <tr>
+              <th scope="col">素材</th>
+              <th scope="col">类型 / 模型</th>
+              <th scope="col" className="num">数据条数</th>
+              <th scope="col" className="num">点击</th>
+              <th scope="col" className="num">成交</th>
+              <th scope="col" className="num">CTR</th>
+              <th scope="col" className="num">花费</th>
+              <th scope="col" className="num">ROI</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.slice(0, 5).map((row) => (
+              <tr key={row.asset.id}>
+                <td><b>{row.asset.title || "生成素材"}</b></td>
+                <td>{row.asset.asset_type === "video" ? "视频" : "图片"} · {row.asset.model || "model"}</td>
+                <td className="num">{row.recordCount}</td>
+                <td className="num">{formatInteger(row.clicks)}</td>
+                <td className="num">{formatInteger(row.conversions)}</td>
+                <td className="num">{formatNumberPercent(row.ctr)}</td>
+                <td className="num">{formatNumberMoney(row.spend)}</td>
+                <td className="num">{formatNumberDecimal(row.roi)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="tbl-note">
+        <svg className="ic ic-sm" aria-hidden="true"><use href="#i-doc"></use></svg>
+        <span>归因只汇总用户回填的经营数据，不代表平台广告后台的实时花费。</span>
       </div>
     </div>
   );
@@ -1847,34 +2466,24 @@ function AssetScaleRecommendationPanel({
   const action = assetScaleAction(recommendation);
 
   return (
-    <div className="mb-5 rounded-md border border-amber-100 bg-amber-50 p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-xs font-medium text-amber-700">素材放量建议</p>
-          <h2 className="mt-1 text-sm font-semibold text-slate-950">
-            {recommendation.asset.title || "生成素材"}
-          </h2>
-          <p className="mt-2 text-sm leading-6 text-slate-700">{action}</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <span className="rounded-md bg-white px-2 py-1 text-xs text-slate-700">
-              CTR {formatNumberPercent(recommendation.ctr)}
-            </span>
-            <span className="rounded-md bg-white px-2 py-1 text-xs text-slate-700">
-              ROI {formatNumberDecimal(recommendation.roi)}
-            </span>
-            <span className="rounded-md bg-white px-2 py-1 text-xs text-slate-700">
-              {recommendation.recordCount} 条数据
-            </span>
+    <div className="tint tint-warn">
+      <span className="tint-lbl">素材放量建议</span>
+      <div className="row row-between">
+        <div className="stack-2 grow">
+          <p><b>{recommendation.asset.title || "生成素材"}</b> — {action}</p>
+          <div className="chip-row">
+            <span className="tag">CTR {formatNumberPercent(recommendation.ctr)}</span>
+            <span className="tag">ROI {formatNumberDecimal(recommendation.roi)}</span>
+            <span className="tag">{recommendation.recordCount} 条数据</span>
           </div>
         </div>
         <a
           href={absoluteMediaUrl(recommendation.asset.url)}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex h-9 w-fit shrink-0 items-center gap-2 rounded-md bg-slate-950 px-3 text-xs font-semibold text-white hover:bg-slate-800"
+          className="btn"
         >
-          <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-          查看素材
+          <svg className="ic ic-sm" aria-hidden="true"><use href="#i-ext"></use></svg>查看素材
         </a>
       </div>
     </div>
@@ -1885,24 +2494,30 @@ function AssetScaleRecommendationPanel({
 function PromotionLinkAlert({ status }: { status?: string }) {
   if (status === "generated") {
     return (
-      <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-        已生成推荐链接。
+      <div className="alert alert-ok">
+        <svg className="ic" aria-hidden="true"><use href="#i-check"></use></svg>
+        <span>已生成推荐链接。</span>
+        <span className="badge badge-online">generated</span>
       </div>
     );
   }
 
   if (status === "created") {
     return (
-      <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-        已保存链接。
+      <div className="alert alert-ok">
+        <svg className="ic" aria-hidden="true"><use href="#i-check"></use></svg>
+        <span>已保存链接。</span>
+        <span className="badge badge-online">created</span>
       </div>
     );
   }
 
   if (status === "failed") {
     return (
-      <div className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-        链接保存失败，请检查 URL 和字段格式。
+      <div className="alert alert-fail">
+        <svg className="ic" aria-hidden="true"><use href="#i-warn"></use></svg>
+        <span><b className="h">链接保存失败</b> · 请检查 URL 和字段格式。短链点击只计数，不触发投放或库存动作。</span>
+        <span className="badge badge-accent">failed</span>
       </div>
     );
   }
@@ -1915,63 +2530,49 @@ function PromotionLinkCard({ link }: { link: PromotionLink }) {
   const shortUrl = shortPromotionLinkUrl(link.short_code);
 
   return (
-    <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-sm font-semibold text-slate-950">{link.label}</h3>
-            <span className="rounded-md bg-white px-2 py-1 text-xs text-slate-600">
-              {promotionLinkTypeLabel(link.link_type)}
+    <article className="panel">
+      <div className="panel-body stack-3">
+        <div className="row row-between">
+          <div className="row">
+            <b>{link.label}</b>
+            <span className="badge">{promotionLinkTypeLabel(link.link_type)}</span>
+            <span className={link.status === "active" ? "badge badge-online" : "badge"}>
+              {link.status === "active" ? "启用" : link.status === "archived" ? "已归档" : link.status === "paused" ? "已暂停" : link.status}
             </span>
-            <span className="rounded-md bg-emerald-50 px-2 py-1 text-xs text-emerald-700">
-              {link.status === "active" ? "启用" : link.status}
-            </span>
-            <span className="rounded-md bg-white px-2 py-1 text-xs text-slate-600">
-              短链点击 {formatInteger(link.click_count)}
-            </span>
+            <span className="badge badge-info">短链点击 {formatInteger(link.click_count)}</span>
           </div>
-          <p className="mt-2 break-all text-xs leading-5 text-slate-500">{link.url}</p>
-          {shortUrl ? (
-            <p className="mt-2 break-all rounded-md bg-white px-2 py-1 text-xs leading-5 text-sky-700">
-              短链：{shortUrl}
-            </p>
-          ) : null}
-          {link.tracking_code ? (
-            <p className="mt-2 w-fit rounded-md bg-white px-2 py-1 text-xs text-slate-600">
-              tracking_code: {link.tracking_code}
-            </p>
-          ) : null}
-          {link.note ? <p className="mt-2 text-sm leading-6 text-slate-600">{link.note}</p> : null}
-        </div>
-        <div className="flex shrink-0 flex-wrap gap-2">
-          {shortUrl ? (
-            <a
-              href={shortUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex h-8 w-fit items-center gap-1.5 rounded-md bg-slate-950 px-3 text-xs font-medium text-white hover:bg-slate-800"
-            >
-              <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-              打开短链
+          <div className="row">
+            {shortUrl ? (
+              <a href={shortUrl} target="_blank" rel="noreferrer" className="btn btn-sm">
+                <svg className="ic ic-sm" aria-hidden="true"><use href="#i-ext"></use></svg>打开短链
+              </a>
+            ) : null}
+            <a href={link.tracking_url || link.url} target="_blank" rel="noreferrer" className="btn btn-sm">
+              <svg className="ic ic-sm" aria-hidden="true"><use href="#i-ext"></use></svg>打开原链
             </a>
-          ) : null}
-          <a
-            href={link.tracking_url || link.url}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex h-8 w-fit items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-            打开原链
-          </a>
+          </div>
         </div>
+        <p className="url">原链：{link.url}</p>
+        {shortUrl ? <p className="url">短链：{shortUrl}</p> : null}
+        <dl className="kv">
+          {link.tracking_code ? (
+            <>
+              <dt>tracking_code</dt><dd className="mono">{link.tracking_code}</dd>
+            </>
+          ) : null}
+          {link.scenario ? (
+            <>
+              <dt>场景</dt><dd>{link.scenario}</dd>
+            </>
+          ) : null}
+          {link.note ? (
+            <>
+              <dt>备注</dt><dd>{link.note}</dd>
+            </>
+          ) : null}
+        </dl>
       </div>
-      {link.scenario ? (
-        <p className="mt-2 w-fit rounded-md bg-white px-2 py-1 text-xs text-slate-600">
-          {link.scenario}
-        </p>
-      ) : null}
-    </div>
+    </article>
   );
 }
 
@@ -1990,38 +2591,46 @@ function PromotionLinkAttributionPanel({
   }
 
   return (
-    <div className="mb-5 rounded-md border border-slate-200 bg-slate-50 p-4">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h2 className="text-sm font-semibold text-slate-950">链接效果归因</h2>
-          <p className="mt-1 text-xs text-slate-500">按经营数据中关联的推荐链接汇总点击、成交、花费和 ROI</p>
+    <div className="panel">
+      <div className="panel-head">
+        <div className="stack-2">
+          <h3>链接效果归因</h3>
+          <p className="mono-note">按经营数据中关联的推荐链接汇总点击、成交、花费和 ROI</p>
         </div>
-        <span className="w-fit rounded-md bg-white px-2.5 py-1 text-xs text-slate-600">
-          {rows.filter((row) => row.recordCount > 0).length} 个有数据
-        </span>
+        <span className="badge">{rows.filter((row) => row.recordCount > 0).length} 个有数据</span>
       </div>
-
-      <div className="mt-4 grid gap-3">
-        {rows.slice(0, 5).map((row) => (
-          <div key={row.link.id} className="rounded-md border border-slate-200 bg-white px-3 py-3">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-semibold text-slate-950">{row.link.label}</p>
-                <p className="mt-1 text-xs text-slate-500">{row.link.scenario || promotionLinkTypeLabel(row.link.link_type)}</p>
-              </div>
-              <span className="w-fit rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600">
-                {row.recordCount} 条数据
-              </span>
-            </div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-5">
-              <InsightMetric label="点击" value={formatInteger(row.clicks)} />
-              <InsightMetric label="成交" value={formatInteger(row.conversions)} />
-              <InsightMetric label="CTR" value={formatNumberPercent(row.ctr)} />
-              <InsightMetric label="花费" value={formatNumberMoney(row.spend)} />
-              <InsightMetric label="ROI" value={formatNumberDecimal(row.roi)} />
-            </div>
-          </div>
-        ))}
+      <div className="tbl-wrap">
+        <table className="tbl tbl-l">
+          <caption className="sr-only">链接效果归因，共 {rows.length} 条</caption>
+          <thead>
+            <tr>
+              <th scope="col">链接</th>
+              <th scope="col">类型</th>
+              <th scope="col" className="num">点击</th>
+              <th scope="col" className="num">成交</th>
+              <th scope="col" className="num">CTR</th>
+              <th scope="col" className="num">花费</th>
+              <th scope="col" className="num">ROI</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.slice(0, 5).map((row) => (
+              <tr key={row.link.id}>
+                <td><b>{row.link.label}</b><br /><span className="mono-note">{row.recordCount} 条数据</span></td>
+                <td>{row.link.scenario || promotionLinkTypeLabel(row.link.link_type)}</td>
+                <td className="num">{formatInteger(row.clicks)}</td>
+                <td className="num">{formatInteger(row.conversions)}</td>
+                <td className="num">{formatNumberPercent(row.ctr)}</td>
+                <td className="num">{formatNumberMoney(row.spend)}</td>
+                <td className="num">{formatNumberDecimal(row.roi)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="tbl-note">
+        <svg className="ic ic-sm" aria-hidden="true"><use href="#i-warn"></use></svg>
+        <span>归因只汇总已回填的经营记录和短链点击，不代表平台广告后台的实时花费。</span>
       </div>
     </div>
   );
@@ -2033,44 +2642,26 @@ function AdWorkflowPanel({ product }: { product: ProductDetail }) {
   const nextStep = steps.find((step) => !step.done) ?? steps[steps.length - 1];
 
   return (
-    <div className="mb-5 rounded-md border border-slate-200 bg-slate-50 p-4">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h2 className="text-sm font-semibold text-slate-950">投放工作流</h2>
-          <p className="mt-1 text-xs text-slate-500">
-            从素材和链接生成实验计划，执行前必须人工确认，回填数据后再复盘。
-          </p>
-        </div>
-        <Link
-          href={nextStep.href}
-          className="inline-flex h-9 w-fit items-center gap-2 rounded-md bg-slate-950 px-3 text-xs font-semibold text-white hover:bg-slate-800"
-        >
-          {nextStep.done ? "查看复盘" : "继续处理"}
-          <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-        </Link>
+    <div className="stack-3">
+      <div className="row row-between">
+        <h3 className="t-h3">投放工作流</h3>
+        <span className="mono-note">素材 → 链接 → 实验 → 人工确认 → 数据复盘</span>
       </div>
-
-      <div className="mt-4 grid gap-2 md:grid-cols-5">
-        {steps.map((step) => (
-          <Link
-            key={step.title}
-            href={step.href}
-            className={`rounded-md border px-3 py-3 transition ${
-              step.done ? "border-emerald-100 bg-emerald-50" : "border-slate-200 bg-white hover:bg-slate-50"
-            }`}
-          >
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-medium text-slate-950">{step.title}</p>
-              {step.done ? (
-                <CheckCircle2 className="h-4 w-4 text-emerald-700" aria-hidden="true" />
-              ) : (
-                <span className="h-2 w-2 rounded-full bg-amber-500" aria-hidden="true" />
-              )}
-            </div>
-            <p className="mt-2 text-xs leading-5 text-slate-500">{step.hint}</p>
-          </Link>
+      <ol className="flow flow-5" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+        {steps.map((step, index) => (
+          <li key={step.title} className={`flow-step ${step.done ? "is-done" : step === nextStep ? "is-next" : "is-idle"}`}>
+            <span className="flow-idx">STEP {String(index + 1).padStart(2, "0")}</span>
+            <Link href={step.href}>
+              <h4>{step.title}</h4>
+              <p>{step.hint}</p>
+              <span className="flow-mark">
+                <svg className="ic ic-sm" aria-hidden="true"><use href={step.done ? "#i-check" : step === nextStep ? "#i-arrow-r" : "#i-chev"}></use></svg>
+                {step.done ? "已完成" : step === nextStep ? "当前步骤" : "未开始"}
+              </span>
+            </Link>
+          </li>
         ))}
-      </div>
+      </ol>
     </div>
   );
 }
@@ -2134,24 +2725,18 @@ function AdLinkRecommendationPanel({
   }
 
   return (
-    <div className="mb-5 rounded-md border border-emerald-100 bg-emerald-50 p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-xs font-medium text-emerald-700">推荐投放链接</p>
-          <h2 className="mt-1 text-sm font-semibold text-slate-950">{bestLink.link.label}</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-700">
+    <div className="tint tint-ok">
+      <span className="tint-lbl">推荐投放链接 · 归因最优</span>
+      <div className="row row-between">
+        <div className="stack-2 grow">
+          <p><b>{bestLink.link.label}</b></p>
+          <p>
             已关联 {bestLink.recordCount} 条经营数据，ROI {formatNumberDecimal(bestLink.roi)}，
             CTR {formatNumberPercent(bestLink.ctr)}。下一轮投放可优先沿用该链接，并继续观察转化稳定性。
           </p>
         </div>
-        <a
-          href={bestLink.link.url}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex h-9 w-fit shrink-0 items-center gap-2 rounded-md bg-slate-950 px-3 text-xs font-semibold text-white hover:bg-slate-800"
-        >
-          <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-          打开链接
+        <a href={bestLink.link.url} target="_blank" rel="noreferrer" className="btn">
+          <svg className="ic ic-sm" aria-hidden="true"><use href="#i-ext"></use></svg>打开链接
         </a>
       </div>
     </div>
@@ -2173,26 +2758,18 @@ function AdAssetRecommendationPanel({
   }
 
   return (
-    <div className="mb-5 rounded-md border border-sky-100 bg-sky-50 p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-xs font-medium text-sky-700">推荐投放素材</p>
-          <h2 className="mt-1 text-sm font-semibold text-slate-950">
-            {recommendation.asset.title || "生成素材"}
-          </h2>
-          <p className="mt-2 text-sm leading-6 text-slate-700">
+    <div className="tint tint-info">
+      <span className="tint-lbl">推荐投放素材 · 归因最优</span>
+      <div className="row row-between">
+        <div className="stack-2 grow">
+          <p><b>{recommendation.asset.title || "生成素材"}</b></p>
+          <p>
             当前素材 ROI {formatNumberDecimal(recommendation.roi)}，CTR {formatNumberPercent(recommendation.ctr)}。
             下一轮建议继续小步放量，并复制 2-3 个同结构不同卖点版本。
           </p>
         </div>
-        <a
-          href={absoluteMediaUrl(recommendation.asset.url)}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex h-9 w-fit shrink-0 items-center gap-2 rounded-md bg-slate-950 px-3 text-xs font-semibold text-white hover:bg-slate-800"
-        >
-          <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-          打开素材
+        <a href={absoluteMediaUrl(recommendation.asset.url)} target="_blank" rel="noreferrer" className="btn">
+          <svg className="ic ic-sm" aria-hidden="true"><use href="#i-ext"></use></svg>打开素材
         </a>
       </div>
     </div>
@@ -2216,87 +2793,83 @@ function AdExperimentDashboardPanel({
   const rows = dashboard.rows.slice(0, 6);
 
   return (
-    <div className="mb-5 rounded-md border border-slate-200 bg-white p-4">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h2 className="text-sm font-semibold text-slate-950">实验看板</h2>
-          <p className="mt-1 text-xs text-slate-500">
-            按投放实验汇总回填数据，快速判断继续、暂停、复制或放量
-          </p>
+    <div className="panel">
+      <div className="panel-head">
+        <div className="stack-2">
+          <h3>实验看板</h3>
+          <p className="mono-note">按投放实验汇总回填数据，快速判断继续、暂停、复制或放量</p>
         </div>
-        <span className="w-fit rounded-md bg-slate-100 px-2.5 py-1 text-xs text-slate-600">
-          {dashboard.measured_experiments}/{dashboard.total_experiments} 已回填
-        </span>
+        <span className="badge">{dashboard.measured_experiments}/{dashboard.total_experiments} 已回填</span>
       </div>
-
-      <div className="mt-4 grid gap-2 sm:grid-cols-4">
-        <InsightMetric label="执行中" value={formatInteger(dashboard.active_experiments)} />
-        <InsightMetric label="总花费" value={formatMoney(dashboard.total_spend)} />
-        <InsightMetric label="总成交额" value={formatMoney(dashboard.total_revenue)} />
-        <InsightMetric label="整体 ROI" value={formatDecimal(dashboard.overall_roi)} />
-      </div>
-
-      {dashboard.best_experiment ? (
-        <div className="mt-4 rounded-md border border-emerald-100 bg-emerald-50 px-3 py-3">
-          <p className="text-xs font-medium text-emerald-700">当前优胜实验</p>
-          <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h3 className="text-sm font-semibold text-slate-950">
-                {dashboard.best_experiment.name}
-              </h3>
-              <p className="mt-1 text-sm leading-6 text-slate-700">
-                ROI {formatDecimal(dashboard.best_experiment.roi)}，CTR{" "}
-                {formatPercent(dashboard.best_experiment.ctr)}。
-                {dashboard.best_experiment.decision_reason}
-              </p>
-            </div>
-            <span className="w-fit shrink-0 rounded-md bg-white px-2.5 py-1 text-xs font-medium text-emerald-700">
-              {adExperimentDecisionLabel(dashboard.best_experiment.decision)}
-            </span>
-          </div>
+      <div className="panel-body stack-4">
+        <div className="metrics">
+          <div className="metric"><span className="lbl">执行中</span><span className="val">{formatInteger(dashboard.active_experiments)}</span></div>
+          <div className="metric"><span className="lbl">总花费</span><span className="val">{formatMoney(dashboard.total_spend)}</span></div>
+          <div className="metric"><span className="lbl">总成交额</span><span className="val">{formatMoney(dashboard.total_revenue)}</span></div>
+          <div className="metric"><span className="lbl">整体 ROI</span><span className={`val${dashboard.overall_roi !== null && Number(dashboard.overall_roi) >= 2 ? " is-ok" : ""}`}>{formatDecimal(dashboard.overall_roi)}</span></div>
         </div>
-      ) : null}
 
-      <div className="mt-4 grid gap-3">
-        {rows.map((row) => (
-          <div key={row.ad_experiment_id} className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3">
-            <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-sm font-semibold text-slate-950">{row.name}</h3>
-                  <span className="rounded-md bg-white px-2 py-1 text-xs text-slate-600">
-                    {adExperimentStatusLabel(row.status)}
-                  </span>
-                  <span className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600">
-                    {formatDateRange(row.period_start, row.period_end)}
-                  </span>
-                </div>
-                <p className="mt-2 text-xs leading-5 text-slate-500">
-                  {generatedAssetTitle(assets, row.generated_asset_id)} ·{" "}
-                  {promotionLinkTitle(links, row.promotion_link_id)}
+        {dashboard.best_experiment ? (
+          <div className="tint tint-ok">
+            <span className="tint-lbl">当前优胜实验</span>
+            <div className="row row-between">
+              <div className="stack-2 grow">
+                <p><b>{dashboard.best_experiment.name}</b></p>
+                <p>
+                  ROI {formatDecimal(dashboard.best_experiment.roi)}，CTR {formatPercent(dashboard.best_experiment.ctr)}。
+                  {dashboard.best_experiment.decision_reason}
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <span className="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-slate-700">
-                  日预算 {formatMoney(row.daily_budget)}
-                </span>
-                <span className="rounded-md bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
-                  {adExperimentDecisionLabel(row.decision)}
-                </span>
-              </div>
+              <span className="badge badge-online">{adExperimentDecisionLabel(dashboard.best_experiment.decision)}</span>
             </div>
-
-            <div className="mt-3 grid gap-2 sm:grid-cols-6">
-              <InsightMetric label="曝光" value={formatInteger(row.impressions)} />
-              <InsightMetric label="点击" value={formatInteger(row.clicks)} />
-              <InsightMetric label="成交" value={formatInteger(row.conversions)} />
-              <InsightMetric label="CTR" value={formatPercent(row.ctr)} />
-              <InsightMetric label="花费" value={formatMoney(row.spend)} />
-              <InsightMetric label="ROI" value={formatDecimal(row.roi)} />
-            </div>
-            <p className="mt-3 text-xs leading-5 text-slate-600">{row.decision_reason}</p>
           </div>
-        ))}
+        ) : null}
+
+        <div className="tbl-wrap">
+          <table className="tbl tbl-x">
+            <caption className="sr-only">实验看板，共 {rows.length} 条</caption>
+            <thead>
+              <tr>
+                <th scope="col">实验</th>
+                <th scope="col">状态</th>
+                <th scope="col">周期</th>
+                <th scope="col" className="num">日预算</th>
+                <th scope="col" className="num">曝光</th>
+                <th scope="col" className="num">点击</th>
+                <th scope="col" className="num">成交</th>
+                <th scope="col" className="num">CTR</th>
+                <th scope="col" className="num">花费</th>
+                <th scope="col" className="num">ROI</th>
+                <th scope="col">决策</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.ad_experiment_id}>
+                  <td>
+                    <div className="cell-goods">
+                      <span>
+                        <b>{row.name}</b>
+                        <span>{generatedAssetTitle(assets, row.generated_asset_id)} · {promotionLinkTitle(links, row.promotion_link_id)}</span>
+                      </span>
+                    </div>
+                  </td>
+                  <td><span className={adExperimentStatusTone(row.status)}>{adExperimentStatusLabel(row.status)}</span></td>
+                  <td className="key">{formatDateRange(row.period_start, row.period_end)}</td>
+                  <td className="num">{formatMoney(row.daily_budget)}</td>
+                  <td className="num">{formatInteger(row.impressions)}</td>
+                  <td className="num">{formatInteger(row.clicks)}</td>
+                  <td className="num">{formatInteger(row.conversions)}</td>
+                  <td className="num">{formatPercent(row.ctr)}</td>
+                  <td className="num">{formatMoney(row.spend)}</td>
+                  <td className="num">{formatDecimal(row.roi)}</td>
+                  <td><span className={adExperimentDecisionTone(row.decision)}>{adExperimentDecisionLabel(row.decision)}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="mono-note">{rows.map((row) => row.decision_reason).filter(Boolean).join("；")}</p>
       </div>
     </div>
   );
@@ -2319,83 +2892,86 @@ function AdExperimentPanel({
   canEdit: boolean;
 }) {
   return (
-    <div className="mb-5 rounded-md border border-slate-200 bg-slate-50 p-4">
+    <div className="panel">
       {status === "generated" ? (
-        <div className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-          已生成投放实验计划，实际投放前仍需人工确认。
+        <div className="alert alert-ok" style={{ margin: "var(--sp-4) var(--sp-4) 0" }}>
+          <svg className="ic" aria-hidden="true"><use href="#i-check"></use></svg>
+          <span>已生成投放实验计划，实际投放前仍需人工确认。</span>
+          <span className="badge badge-online">generated</span>
         </div>
       ) : null}
       {status === "failed" ? (
-        <div className="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-          实验计划生成失败，请先确认素材、链接和经营数据是否已保存。
+        <div className="alert alert-fail" style={{ margin: "var(--sp-4) var(--sp-4) 0" }}>
+          <svg className="ic" aria-hidden="true"><use href="#i-warn"></use></svg>
+          <span>实验计划生成失败，请先确认素材、链接和经营数据是否已保存。</span>
+          <span className="badge badge-accent">failed</span>
         </div>
       ) : null}
       {status === "updated" ? (
-        <div className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-          实验状态已更新。
+        <div className="alert alert-ok" style={{ margin: "var(--sp-4) var(--sp-4) 0" }}>
+          <svg className="ic" aria-hidden="true"><use href="#i-check"></use></svg>
+          <span>实验状态已更新。</span>
+          <span className="badge badge-online">updated</span>
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 className="text-sm font-semibold text-slate-950">投放实验计划</h2>
-          <p className="mt-1 text-xs text-slate-500">
-            把推荐素材和推荐链接组合成可复盘的测试单，只做计划和记录，不自动执行资金操作
-          </p>
+      <div className="panel-head">
+        <div className="stack-2">
+          <h3>投放实验计划</h3>
+          <p className="mono-note">把推荐素材和推荐链接组合成可复盘的测试单，只做计划和记录，不自动执行资金操作</p>
         </div>
         {canEdit ? (
           <form action={`/products/${productId}/ad-experiments/generate`} method="post">
-          <button
-            type="submit"
-            className="inline-flex h-9 w-fit items-center justify-center gap-2 rounded-md bg-slate-950 px-3 text-xs font-semibold text-white transition hover:bg-slate-800"
-          >
-            <Megaphone className="h-3.5 w-3.5" aria-hidden="true" />
-            生成实验
-          </button>
+            <button type="submit" className="btn btn-primary">
+              <svg className="ic ic-sm" aria-hidden="true"><use href="#i-arrow-r"></use></svg>生成实验
+            </button>
           </form>
         ) : null}
       </div>
 
-      {experiments.length === 0 ? (
-        <div className="mt-4 rounded-md border border-dashed border-slate-300 bg-white px-4 py-8 text-center text-sm text-slate-500">
-          还没有实验计划。可以先用现有素材和链接生成第一条小预算测试单。
-        </div>
-      ) : (
-        <div className="mt-4 grid gap-3">
-          {experiments.map((experiment) => (
-            <div key={experiment.id} className="rounded-md border border-slate-200 bg-white px-4 py-3">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-sm font-semibold text-slate-950">{experiment.name}</h3>
-                    <span className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600">
-                      {adExperimentStatusLabel(experiment.status)}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-sm leading-6 text-slate-700">{experiment.objective}</p>
+      <div className="panel-body stack-3">
+        {experiments.length === 0 ? (
+          <div className="empty">
+            <svg className="ic ic-lg" aria-hidden="true"><use href="#i-agent"></use></svg>
+            <h4>还没有实验计划</h4>
+            <p>可以先用现有素材和链接生成第一条小预算测试单。实验只做计划和记录，执行前必须人工确认。</p>
+            <p className="empty-next">
+              <svg className="ic ic-sm" aria-hidden="true"><use href="#i-chev"></use></svg>
+              生成后这里出现：实验目标 · 关联素材 / 链接 · 人群 · 成功指标 · 状态操作
+            </p>
+          </div>
+        ) : (
+          experiments.map((experiment) => (
+            <div key={experiment.id} className="panel">
+              <div className="panel-head">
+                <div className="stack-2">
+                  <h3>{experiment.name}</h3>
+                  <p className="mono-note">{experiment.objective}</p>
                 </div>
-                <span className="w-fit shrink-0 rounded-md bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
-                  日预算 {formatMoney(experiment.daily_budget)}
-                </span>
+                <div className="row">
+                  <span className={adExperimentStatusTone(experiment.status)}>{adExperimentStatusLabel(experiment.status)}</span>
+                  <span className="badge badge-warn">日预算 {formatMoney(experiment.daily_budget)}</span>
+                </div>
               </div>
-
-              <div className="mt-3 grid gap-2 lg:grid-cols-2">
-                <PlanField label="关联素材" value={generatedAssetTitle(assets, experiment.generated_asset_id)} />
-                <PlanField label="承接链接" value={promotionLinkTitle(links, experiment.promotion_link_id)} />
-                <PlanField label="人群" value={experiment.audience ?? "待补充"} />
-                <PlanField label="成功指标" value={experiment.success_metric ?? "待补充"} highlight />
+              <div className="panel-body stack-3">
+                <dl className="kv">
+                  <dt>关联素材</dt><dd>{generatedAssetTitle(assets, experiment.generated_asset_id)}</dd>
+                  <dt>承接链接</dt><dd>{promotionLinkTitle(links, experiment.promotion_link_id)}</dd>
+                  <dt>人群</dt><dd>{experiment.audience ?? "待补充"}</dd>
+                  <dt>成功指标</dt><dd><b>{experiment.success_metric ?? "待补充"}</b></dd>
+                </dl>
+                {experiment.hypothesis ? (
+                  <div className="tint tint-info">
+                    <span className="tint-lbl">假设</span>
+                    <p>{experiment.hypothesis}</p>
+                  </div>
+                ) : null}
+                <AdExperimentStatusActions productId={productId} experiment={experiment} canEdit={canEdit} />
               </div>
-
-              {experiment.hypothesis ? (
-                <p className="mt-3 rounded-md bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-600">
-                  {experiment.hypothesis}
-                </p>
-              ) : null}
-              <AdExperimentStatusActions productId={productId} experiment={experiment} canEdit={canEdit} />
             </div>
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </div>
     </div>
   );
 }
@@ -2412,14 +2988,14 @@ function AdExperimentStatusActions({
 }) {
   const nextStatuses =
     experiment.status === "draft"
-      ? [{ status: "active", label: "标记执行中" }]
+      ? [{ status: "active", label: "标记执行中", primary: true }]
       : experiment.status === "active"
         ? [
-            { status: "paused", label: "标记暂停" },
-            { status: "completed", label: "标记完成" },
+            { status: "paused", label: "标记暂停", primary: false },
+            { status: "completed", label: "标记完成", primary: false },
           ]
         : experiment.status === "paused"
-          ? [{ status: "active", label: "恢复执行" }]
+          ? [{ status: "active", label: "恢复执行", primary: true }]
           : [];
 
   if (!canEdit || nextStatuses.length === 0) {
@@ -2427,7 +3003,7 @@ function AdExperimentStatusActions({
   }
 
   return (
-    <div className="mt-3 flex flex-wrap gap-2">
+    <div className="row">
       {nextStatuses.map((item) => (
         <form
           key={item.status}
@@ -2435,10 +3011,7 @@ function AdExperimentStatusActions({
           method="post"
         >
           <input type="hidden" name="status" value={item.status} />
-          <button
-            type="submit"
-            className="h-8 rounded-md border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 hover:bg-slate-50"
-          >
+          <button type="submit" className={item.primary ? "btn btn-primary btn-sm" : "btn btn-sm"}>
             {item.label}
           </button>
         </form>
@@ -2459,6 +3032,18 @@ function adExperimentStatusLabel(status: string): string {
   return labels[status] ?? status;
 }
 
+/** 把投放实验状态映射为徽标样式，避免组件内散落条件分支。 */
+function adExperimentStatusTone(status: string): string {
+  const tones: Record<string, string> = {
+    active: "badge badge-online",
+    archived: "badge",
+    completed: "badge badge-online",
+    draft: "badge",
+    paused: "badge badge-warn",
+  };
+  return tones[status] ?? "badge";
+}
+
 /** 把投放实验决策状态映射为中文显示文本，保持页面口径一致。 */
 function adExperimentDecisionLabel(decision: string): string {
   const labels: Record<string, string> = {
@@ -2469,6 +3054,18 @@ function adExperimentDecisionLabel(decision: string): string {
     scale: "可放量",
   };
   return labels[decision] ?? decision;
+}
+
+/** 把投放实验决策状态映射为徽标样式，避免组件内散落条件分支。 */
+function adExperimentDecisionTone(decision: string): string {
+  const tones: Record<string, string> = {
+    keep: "badge badge-info",
+    needs_data: "badge badge-warn",
+    observe: "badge badge-info",
+    pause: "badge badge-warn",
+    scale: "badge badge-online",
+  };
+  return tones[decision] ?? "badge";
 }
 
 /** 格式化日期range，统一空值、本地化和页面展示规则，避免各组件重复格式化。 */
@@ -2503,32 +3100,40 @@ function CompetitorImportAlert({
 }) {
   if (importStatus === "queued") {
     return (
-      <div className="mb-4 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-700">
-        已创建竞品链接解析任务，可在任务中心查看后续处理结果。
+      <div className="alert alert-info">
+        <svg className="ic" aria-hidden="true"><use href="#i-doc"></use></svg>
+        <span>已创建竞品链接解析任务，可在任务页签查看后续处理结果。</span>
+        <span className="badge badge-info">queued</span>
       </div>
     );
   }
 
   if (importStatus === "success") {
     return (
-      <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-        已解析链接并添加为竞品。
+      <div className="alert alert-ok">
+        <svg className="ic" aria-hidden="true"><use href="#i-check"></use></svg>
+        <span>已解析链接并添加为竞品。</span>
+        <span className="badge badge-online">success</span>
       </div>
     );
   }
 
   if (importStatus === "failed") {
     return (
-      <div className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-        竞品链接解析失败。可换一个公开商品页，或先用手动表单录入关键字段。
+      <div className="alert alert-fail">
+        <svg className="ic" aria-hidden="true"><use href="#i-warn"></use></svg>
+        <span><b className="h">竞品链接解析失败</b> · 可换一个公开商品页，或先用手动表单录入关键字段。</span>
+        <span className="badge badge-accent">failed</span>
       </div>
     );
   }
 
   if (competitorStatus === "failed") {
     return (
-      <div className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-        竞品保存失败，请检查名称、链接和价格格式。
+      <div className="alert alert-fail">
+        <svg className="ic" aria-hidden="true"><use href="#i-warn"></use></svg>
+        <span><b className="h">竞品保存失败</b> · 请检查名称、链接和价格格式。</span>
+        <span className="badge badge-accent">failed</span>
       </div>
     );
   }
@@ -2555,46 +3160,49 @@ function CompetitorInsightsPanel({ insights }: { insights: CompetitorInsights })
   }
 
   return (
-    <div className="mb-5 rounded-md border border-slate-200 bg-slate-50 p-4">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h2 className="text-sm font-semibold text-slate-950">竞品洞察</h2>
-          <p className="mt-1 text-xs text-slate-500">基于当前竞品记录汇总价格带、卖点频次和数据完整度</p>
+    <div className="panel">
+      <div className="panel-head">
+        <div className="stack-2">
+          <h3>竞品洞察</h3>
+          <p className="mono-note">基于当前竞品记录汇总价格带、卖点频次和数据完整度；缺样本时不推断真实市场</p>
         </div>
-        <span className="w-fit rounded-md bg-white px-2.5 py-1 text-xs text-slate-600">
-          完整度 {insights.completeness}%
-        </span>
+        <span className="badge badge-info">完整度 {insights.completeness}%</span>
       </div>
-
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <InsightMetric label="竞品数量" value={`${insights.competitorCount} 个`} />
-        <InsightMetric
-          label="价格带"
-          value={
-            insights.priceSampleCount > 0
-              ? `${formatNumberMoney(insights.minPrice ?? 0)} - ${formatNumberMoney(insights.maxPrice ?? 0)}`
-              : "待补充"
-          }
-        />
-        <InsightMetric
-          label="均价"
-          value={insights.averagePrice === null ? "待补充" : formatNumberMoney(insights.averagePrice)}
-        />
-        <InsightMetric label="价格位置" value={`低于 ${insights.higherCount} 个，高于 ${insights.cheaperCount} 个`} />
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        {insights.topSellingPoints.length > 0 ? (
-          insights.topSellingPoints.map((point) => (
-            <span key={point.name} className="rounded-md bg-white px-2.5 py-1 text-xs text-slate-700">
-              {point.name} × {point.count}
+      <div className="panel-body stack-4">
+        <div className="metrics">
+          <div className="metric"><span className="lbl">竞品数量</span><span className="val">{insights.competitorCount} 个</span></div>
+          <div className="metric">
+            <span className="lbl">价格带</span>
+            <span className="val">
+              {insights.priceSampleCount > 0
+                ? `${formatNumberMoney(insights.minPrice ?? 0)} - ${formatNumberMoney(insights.maxPrice ?? 0)}`
+                : "待补充"}
             </span>
-          ))
-        ) : (
-          <span className="rounded-md bg-white px-2.5 py-1 text-xs text-slate-500">
-            待补充竞品卖点
-          </span>
-        )}
+          </div>
+          <div className="metric">
+            <span className="lbl">均价</span>
+            <span className="val">{insights.averagePrice === null ? "待补充" : formatNumberMoney(insights.averagePrice)}</span>
+          </div>
+          <div className="metric"><span className="lbl">价格位置</span><span className="val">低于 {insights.higherCount} 个，高于 {insights.cheaperCount} 个</span></div>
+        </div>
+
+        <div>
+          <span className="eyebrow">卖点频次（跨竞品）</span>
+          <div className="chip-row" style={{ marginTop: ".5rem" }}>
+            {insights.topSellingPoints.length > 0 ? (
+              insights.topSellingPoints.map((point) => (
+                <span key={point.name} className="tag">{point.name} ×{point.count}</span>
+              ))
+            ) : (
+              <span className="tag">待补充竞品卖点</span>
+            )}
+          </div>
+        </div>
+
+        <div className="tint tint-info">
+          <span className="tint-lbl">读法</span>
+          <p>频次高的卖点已在同类竞品里普及，不再是差异化点；只被 1 个竞品提到的卖点才是本品主图方案可以抢占的认知空位。</p>
+        </div>
       </div>
     </div>
   );
@@ -2619,83 +3227,82 @@ function CompetitorMonitorPanel({
   }
 
   return (
-    <div className="mt-5 rounded-md border border-slate-200 bg-slate-50 p-4">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h2 className="text-sm font-semibold text-slate-950">竞品监控</h2>
-          <p className="mt-1 text-xs text-slate-500">保存监控频率和快照，检查时只解析已录入的公开链接</p>
+    <div className="panel">
+      <div className="panel-head">
+        <div className="stack-2">
+          <h3>竞品监控</h3>
+          <p className="mono-note">保存监控频率和快照，检查时只解析已录入的公开链接</p>
         </div>
-        <span className="w-fit rounded-md bg-white px-2.5 py-1 text-xs text-slate-600">
-          已启用 {monitors.filter((monitor) => monitor.status === "active").length} 个
-        </span>
+        <span className="badge badge-online">已启用 {monitors.filter((monitor) => monitor.status === "active").length} 个</span>
       </div>
+      <div className="tbl-wrap">
+        <table className="tbl tbl-x">
+          <caption className="sr-only">竞品监控，共 {competitors.length} 条</caption>
+          <thead>
+            <tr>
+              <th scope="col">竞品</th>
+              <th scope="col">监控节奏</th>
+              <th scope="col">上次检查</th>
+              <th scope="col">下次检查</th>
+              <th scope="col" className="wrap-cell">最新快照变化</th>
+              <th scope="col">动作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {competitors.map((competitor) => {
+              const monitor = monitorByCompetitor.get(competitor.id);
+              const latestSnapshot = monitor?.snapshots?.[0];
 
-      <div className="mt-4 divide-y divide-slate-200 overflow-hidden rounded-md border border-slate-200 bg-white">
-        {competitors.map((competitor) => {
-          const monitor = monitorByCompetitor.get(competitor.id);
-          const latestSnapshot = monitor?.snapshots?.[0];
-
-          return (
-            <div key={competitor.id} className="grid gap-3 px-4 py-3 text-sm lg:grid-cols-[1.1fr_0.9fr_1.4fr_auto] lg:items-center">
-              <div>
-                <p className="font-medium text-slate-950">{competitor.name}</p>
-                <p className="mt-1 text-xs text-slate-500">
-                  {monitor ? `每 ${monitor.interval_days} 天检查` : competitor.url ? "可启用监控" : "缺少链接"}
-                </p>
-              </div>
-              <div className="text-xs text-slate-500">
-                <p>上次：{monitor?.last_checked_at ? formatDateTime(monitor.last_checked_at) : "-"}</p>
-                <p className="mt-1">下次：{monitor?.next_check_at ? formatDateTime(monitor.next_check_at) : "-"}</p>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {latestSnapshot?.error ? (
-                  <span className="rounded-md bg-rose-50 px-2 py-1 text-xs text-rose-700">{latestSnapshot.error}</span>
-                ) : (
-                  (latestSnapshot?.changes ?? ["暂无快照"]).slice(0, 3).map((change) => (
-                    <span key={change} className="rounded-md bg-sky-50 px-2 py-1 text-xs text-sky-700">
-                      {change}
-                    </span>
-                  ))
-                )}
-              </div>
-              <div className="flex gap-2">
-                {canEdit && monitor ? (
-                  <form action={`/products/${productId}/competitor-monitors/${monitor.id}/run`} method="post">
-                    <button
-                      type="submit"
-                      className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-slate-950 px-3 text-xs font-semibold text-white transition hover:bg-slate-800"
-                    >
-                      <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
-                      检查
-                    </button>
-                  </form>
-                ) : canEdit ? (
-                  <form action={`/products/${productId}/competitors/${competitor.id}/monitor`} method="post" className="flex gap-2">
-                    <input type="hidden" name="interval_days" value="1" />
-                    <button
-                      type="submit"
-                      disabled={!competitor.url}
-                      className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-white px-3 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
-                    >
-                      启用
-                    </button>
-                  </form>
-                ) : null}
-              </div>
-            </div>
-          );
-        })}
+              return (
+                <tr key={competitor.id}>
+                  <td><b>{competitor.name}</b><br /><span className="mono-note">{platformLabels[competitor.platform]}</span></td>
+                  <td className="key">{monitor ? `每 ${monitor.interval_days} 天` : competitor.url ? "可启用" : "缺少链接"}</td>
+                  <td className="key">{monitor?.last_checked_at ? `${formatDateTime(monitor.last_checked_at)}${latestSnapshot?.error ? "（失败）" : ""}` : "—"}</td>
+                  <td className="key">{monitor?.next_check_at ? formatDateTime(monitor.next_check_at) : "—"}</td>
+                  <td>
+                    <div className="chip-row">
+                      {latestSnapshot?.error ? (
+                        <span className="badge badge-accent">快照失败 · {latestSnapshot.error}</span>
+                      ) : latestSnapshot?.changes?.length ? (
+                        latestSnapshot.changes.slice(0, 3).map((change) => (
+                          <span key={change} className="badge badge-info">{change}</span>
+                        ))
+                      ) : (
+                        <span className="badge">{monitor ? "无变化" : "暂无快照"}</span>
+                      )}
+                    </div>
+                  </td>
+                  <td>
+                    <div className="actions">
+                      {canEdit && monitor ? (
+                        <form action={`/products/${productId}/competitor-monitors/${monitor.id}/run`} method="post">
+                          <button type="submit" className="btn btn-sm">立即检查</button>
+                        </form>
+                      ) : canEdit ? (
+                        <form action={`/products/${productId}/competitors/${competitor.id}/monitor`} method="post">
+                          <input type="hidden" name="interval_days" value="1" />
+                          <button type="submit" disabled={!competitor.url} className="btn btn-sm">启用监控</button>
+                        </form>
+                      ) : null}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );
 }
 
 /** 渲染 InsightMetric 组件，集中展示洞察指标所需的数据、状态和操作入口。 */
-function InsightMetric({ label, value }: { label: string; value: string }) {
+function InsightMetric({ label, value, tone = "default" }: { label: string; value: string; tone?: "default" | "ok" | "warn" | "accent" | "idle" }) {
+  const toneClass = tone === "ok" ? " is-ok" : tone === "warn" ? " is-warn" : tone === "accent" ? " is-accent" : tone === "idle" ? " is-idle" : "";
   return (
-    <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="mt-1 text-sm font-semibold text-slate-950">{value}</p>
+    <div className="metric">
+      <span className="lbl">{label}</span>
+      <span className={`val${toneClass}`}>{value}</span>
     </div>
   );
 }
@@ -2712,24 +3319,30 @@ function PerformanceImportAlert({
 }) {
   if (importStatus === "success") {
     return (
-      <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-        已导入 {count ?? "多"} 条经营数据。
+      <div className="alert alert-ok">
+        <svg className="ic" aria-hidden="true"><use href="#i-check"></use></svg>
+        <span>已导入 {count ?? "多"} 条经营数据。</span>
+        <span className="badge badge-online">imported</span>
       </div>
     );
   }
 
   if (importStatus === "empty") {
     return (
-      <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
-        CSV 中没有可导入的数据，请检查日期列和表头。
+      <div className="alert alert-warn">
+        <svg className="ic" aria-hidden="true"><use href="#i-warn"></use></svg>
+        <span>CSV 中没有可导入的数据，请检查日期列和表头。</span>
+        <span className="badge badge-warn">empty</span>
       </div>
     );
   }
 
   if (importStatus === "failed" || performanceStatus === "failed") {
     return (
-      <div className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-        数据保存失败，请检查日期、数字格式和素材 ID 是否属于当前商品。
+      <div className="alert alert-fail">
+        <svg className="ic" aria-hidden="true"><use href="#i-warn"></use></svg>
+        <span><b className="h">数据保存失败</b> · 请检查日期、数字格式和素材 ID 是否属于当前商品。</span>
+        <span className="badge badge-accent">failed</span>
       </div>
     );
   }
@@ -2755,23 +3368,19 @@ function PerformanceSummaryCards({ summary }: { summary: PerformanceSummary }) {
     return null;
   }
 
-  const items = [
-    { label: "数据周期", value: `${summary.recordCount} 条` },
-    { label: "总曝光", value: formatInteger(summary.impressions) },
-    { label: "整体 CTR", value: formatNumberPercent(summary.ctr) },
-    { label: "总成交", value: formatInteger(summary.conversions) },
-    { label: "总花费", value: formatNumberMoney(summary.spend) },
-    { label: "整体 ROI", value: formatNumberDecimal(summary.roi) },
-  ];
-
   return (
-    <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-      {items.map((item) => (
-        <div key={item.label} className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
-          <p className="text-xs text-slate-500">{item.label}</p>
-          <p className="mt-1 text-lg font-semibold text-slate-950">{item.value}</p>
+    <div className="panel">
+      <div className="panel-head"><h3>经营数据汇总</h3><span className="badge">{summary.recordCount} 条记录</span></div>
+      <div className="panel-body">
+        <div className="metrics metrics-6">
+          <InsightMetric label="数据周期" value={`${summary.recordCount} 条`} />
+          <InsightMetric label="总曝光" value={formatInteger(summary.impressions)} />
+          <InsightMetric label="整体 CTR" value={formatNumberPercent(summary.ctr)} />
+          <InsightMetric label="总成交" value={formatInteger(summary.conversions)} />
+          <InsightMetric label="总花费" value={formatNumberMoney(summary.spend)} />
+          <InsightMetric label="整体 ROI" value={formatNumberDecimal(summary.roi)} tone={(summary.roi ?? 0) >= 2 ? "ok" : "default"} />
         </div>
-      ))}
+      </div>
     </div>
   );
 }
@@ -2790,38 +3399,34 @@ function PerformanceTrendPanel({ records }: { records: PerformanceRecord[] }) {
   const maxRoi = Math.max(...roiValues, 1);
 
   return (
-    <div className="mb-5 rounded-md border border-slate-200 bg-white p-4">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h2 className="text-sm font-semibold text-slate-950">经营趋势</h2>
-          <p className="mt-1 text-xs text-slate-500">查看最近 {trendRecords.length} 条数据的 CTR、转化率和 ROI 变化</p>
+    <div className="panel">
+      <div className="panel-head">
+        <h3>经营趋势</h3>
+        <div className="row">
+          <span className="badge">最近 {trendRecords.length} 条</span>
+          <span className="mono-note">CTR / 转化率按 8% 满格，ROI 按区间最大值满格</span>
         </div>
-        <span className="w-fit rounded-md bg-slate-100 px-2.5 py-1 text-xs text-slate-600">
-          最近记录
-        </span>
       </div>
-
-      <div className="mt-4 grid gap-3">
+      <div className="panel-body stack-4">
         {trendRecords.map((record) => {
           const ctr = numberValue(record.ctr);
           const conversionRate = numberValue(record.conversion_rate);
           const roi = numberValue(record.roi);
 
           return (
-            <div key={record.id} className="grid gap-2 rounded-md bg-slate-50 px-3 py-3">
-              <div className="flex items-center justify-between gap-3 text-xs">
-                <span className="font-medium text-slate-700">
-                  {record.period_start} 至 {record.period_end}
-                </span>
-                <span className="text-slate-500">{record.conversions ?? 0} 单</span>
+            <div key={record.id} className="stack-3">
+              <div className="row row-between">
+                <span className="mono-note">{record.period_start} 至 {record.period_end}</span>
+                <span className="mono-note">{record.conversions ?? 0} 单</span>
               </div>
-              <TrendBar label="CTR" value={formatNumberPercent(ctr)} percent={Math.min(ctr / 0.08, 1) * 100} />
+              <TrendBar label="CTR" value={formatNumberPercent(ctr)} percent={Math.min(ctr / 0.08, 1) * 100} tone="info" />
               <TrendBar
                 label="转化"
                 value={formatNumberPercent(conversionRate)}
                 percent={Math.min(conversionRate / 0.08, 1) * 100}
+                tone="info"
               />
-              <TrendBar label="ROI" value={formatNumberDecimal(roi)} percent={(roi / maxRoi) * 100} accent />
+              <TrendBar label="ROI" value={formatNumberDecimal(roi)} percent={(roi / maxRoi) * 100} tone="accent" />
             </div>
           );
         })}
@@ -2832,47 +3437,54 @@ function PerformanceTrendPanel({ records }: { records: PerformanceRecord[] }) {
 
 /** 渲染 TrendBar 组件，集中展示趋势bar所需的数据、状态和操作入口。 */
 function TrendBar({
-  accent = false,
+  tone = "info",
   label,
   percent,
   value,
 }: {
-  accent?: boolean;
+  tone?: "info" | "accent" | "ok" | "run";
   label: string;
   percent: number;
   value: string;
 }) {
+  const toneClass = tone === "accent" ? " is-accent" : tone === "ok" ? " is-ok" : tone === "run" ? " is-run" : " is-info";
   return (
-    <div className="grid grid-cols-[52px_1fr_54px] items-center gap-2 text-xs">
-      <span className="text-slate-500">{label}</span>
-      <div className="h-2 overflow-hidden rounded-full bg-white">
-        <div
-          className={`h-full rounded-full ${accent ? "bg-emerald-500" : "bg-sky-500"}`}
-          style={{ width: `${Math.max(4, Math.min(percent, 100))}%` }}
-        />
+    <div className="trend">
+      <span className="t-lbl">{label}</span>
+      <div className="bar" role="img" aria-label={`${label} ${value}`}>
+        <i className={toneClass.trim()} style={{ width: `${Math.max(4, Math.min(percent, 100))}%` }}></i>
       </div>
-      <span className="text-right font-medium text-slate-700">{value}</span>
+      <span className="t-val">{value}</span>
     </div>
   );
 }
 
 /** 渲染 StageCard 组件，集中展示阶段卡片所需的数据、状态和操作入口。 */
 function StageCard({
-  icon: Icon,
+  icon,
   title,
   detail,
+  actionLabel,
+  actionHref,
 }: {
-  icon: typeof CircleDollarSign;
+  icon: string;
   title: string;
   detail: string;
+  actionLabel?: string;
+  actionHref?: string;
 }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-4">
-      <div className="flex h-9 w-9 items-center justify-center rounded-md bg-slate-100 text-slate-700">
-        <Icon className="h-4 w-4" aria-hidden="true" />
+    <div className="panel">
+      <div className="panel-body stack-3">
+        <div className="row row-between">
+          <span className="wf-icon" aria-hidden="true"><svg className="ic" aria-hidden="true"><use href={icon}></use></svg></span>
+        </div>
+        <h3>{title}</h3>
+        <p className="mono-note">{detail}</p>
+        {actionLabel && actionHref ? (
+          <Link className="btn btn-primary" href={actionHref}>{actionLabel}</Link>
+        ) : null}
       </div>
-      <h3 className="mt-4 text-sm font-semibold text-slate-950">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-slate-500">{detail}</p>
     </div>
   );
 }
@@ -2894,54 +3506,54 @@ function GenerationJobSummary({
   }
 
   return (
-    <section className="rounded-md border border-slate-200 bg-white px-4 py-3">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-sm font-semibold text-slate-950">生成任务</h2>
-          <p className="mt-1 text-xs text-slate-500">图片和视频生成会在后台继续执行，页面会自动刷新状态。</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {jobs.map((job) => (
-            <div
-              key={job.id}
-              className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5"
-            >
-              <span className="text-xs text-slate-500">{job.kind === "video_asset" ? "视频" : "图片"} #{job.id}</span>
-              <JobStatusBadge job={job} />
-              {canEdit && job.status === "failed" ? (
-                <form action={`/products/${productId}/generation-jobs/${job.id}/retry`} method="post">
-                  <input type="hidden" name="tab" value={activeTab} />
-                  <button
-                    type="submit"
-                    className="h-6 rounded-md bg-slate-950 px-2 text-xs font-medium text-white hover:bg-slate-800"
-                  >
-                    重试
-                  </button>
-                </form>
-              ) : canEdit && (job.status === "pending" || job.status === "running") ? (
-                <form action={`/products/${productId}/generation-jobs/${job.id}/cancel`} method="post">
-                  <input type="hidden" name="tab" value={activeTab} />
-                  <button
-                    type="submit"
-                    className="h-6 rounded-md border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                  >
-                    取消
-                  </button>
-                </form>
-              ) : null}
-            </div>
-          ))}
+    <section className="stack-3" aria-label="生成任务摘要">
+      <div className="row row-between">
+        <span className="eyebrow">生成任务</span>
+        <div className="row">
+          {jobs.some((job) => ["pending", "running"].includes(job.status)) ? (
+            <span className="badge badge-warn"><span className="status-led is-busy" aria-hidden="true"></span>自动刷新中</span>
+          ) : null}
+          <Link className="mono-note" href={`/products/${productId}?tab=jobs`} style={{ minHeight: "44px", display: "inline-flex", alignItems: "center" }}>查看任务中心</Link>
         </div>
       </div>
-      {jobs.some((job) => job.status === "failed" && job.error) ? (
-        <div className="mt-3 grid gap-2">
-          {jobs
-            .filter((job) => job.status === "failed" && job.error)
-            .map((job) => (
-              <JobError key={job.id} job={job} />
-            ))}
-        </div>
-      ) : null}
+      <div className="grid-3">
+        {jobs.map((job) => (
+          <div
+            key={job.id}
+            className={`job ${job.status === "running" || job.status === "pending" ? "is-run" : job.status === "succeeded" ? "is-ok" : job.status === "failed" ? "is-fail" : ""}`}
+          >
+            <div className="job-hd">
+              <JobStatusBadge job={job} />
+              <span className="job-id">{job.kind === "video_asset" ? "视频" : "图片"} #{job.id}</span>
+            </div>
+            <div className="stack-2">
+              {job.status === "succeeded" && jobResultUrl(job) ? (
+                <a className="lnk" href={absoluteMediaUrl(jobResultUrl(job) || "")} target="_blank" rel="noreferrer">
+                  <svg className="ic ic-sm" aria-hidden="true"><use href="#i-ext"></use></svg>打开生成结果
+                </a>
+              ) : job.error ? (
+                <p className="mono-note" style={{ color: "var(--accent)" }}>{job.error}</p>
+              ) : (
+                <p className="mono-note">{job.started_at ? `开始于 ${formatDateTime(job.started_at)}` : "等待后台执行"}</p>
+              )}
+              <div className="row">
+                <Link className="btn btn-sm" href={`/products/${productId}/generation-jobs/${job.id}`}>详情</Link>
+                {canEdit && job.status === "failed" ? (
+                  <form action={`/products/${productId}/generation-jobs/${job.id}/retry`} method="post">
+                    <input type="hidden" name="tab" value={activeTab} />
+                    <button type="submit" className="btn btn-sm btn-primary">重试</button>
+                  </form>
+                ) : canEdit && (job.status === "pending" || job.status === "running") ? (
+                  <form action={`/products/${productId}/generation-jobs/${job.id}/cancel`} method="post">
+                    <input type="hidden" name="tab" value={activeTab} />
+                    <button type="submit" className="btn btn-sm">取消</button>
+                  </form>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
@@ -2960,19 +3572,17 @@ function JobStatusBadge({ job }: { job: GenerationJob | undefined }) {
     cancelled: "已取消",
   };
   const tone: Record<GenerationJob["status"], string> = {
-    pending: "bg-slate-100 text-slate-600",
-    running: "bg-amber-50 text-amber-700",
-    succeeded: "bg-emerald-50 text-emerald-700",
-    failed: "bg-rose-50 text-rose-700",
-    cancelled: "bg-slate-100 text-slate-500",
+    pending: "badge",
+    running: "badge badge-warn",
+    succeeded: "badge badge-online",
+    failed: "badge badge-accent",
+    cancelled: "badge",
   };
 
   return (
-    <span
-      className={`inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-2.5 text-xs font-medium ${tone[job.status]}`}
-    >
+    <span className={tone[job.status]}>
       {job.status === "pending" || job.status === "running" ? (
-        <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+        <span className="status-led is-busy" aria-hidden="true"></span>
       ) : null}
       {statusLabels[job.status]}
     </span>
@@ -2988,14 +3598,14 @@ function LinkParseTaskStatusBadge({ status }: { status: string }) {
     failed: "失败",
   };
   const tone: Record<string, string> = {
-    pending: "bg-amber-50 text-amber-700",
-    running: "bg-sky-50 text-sky-700",
-    succeeded: "bg-emerald-50 text-emerald-700",
-    failed: "bg-rose-50 text-rose-700",
+    pending: "badge badge-warn",
+    running: "badge badge-info",
+    succeeded: "badge badge-online",
+    failed: "badge badge-accent",
   };
 
   return (
-    <span className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${tone[status] ?? "bg-slate-100 text-slate-600"}`}>
+    <span className={tone[status] ?? "badge"}>
       {statusLabels[status] ?? status}
     </span>
   );
@@ -3008,8 +3618,9 @@ function JobError({ job }: { job: GenerationJob | undefined }) {
   }
 
   return (
-    <div className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs leading-5 text-rose-700">
-      {job.error}
+    <div className="alert alert-fail" style={{ gridTemplateColumns: "18px minmax(0,1fr)" }}>
+      <svg className="ic" aria-hidden="true"><use href="#i-warn"></use></svg>
+      <span className="mono">{job.error}</span>
     </div>
   );
 }
@@ -3092,6 +3703,19 @@ function collectAssetsFromCreativePlans(
   ]);
 }
 
+/** 统计素材状态分布，输出「通过 x · 待评估 y」形态的摘要文本。 */
+function countAssetStatuses(assets: AssetLibraryItem[]): string {
+  if (assets.length === 0) {
+    return "先生成方案再出图";
+  }
+  const counts = new Map<string, number>();
+  for (const asset of assets) {
+    const key = asset.status || "未标注";
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return [...counts.entries()].map(([status, count]) => `${status} ${count}`).join(" · ");
+}
+
 /** 渲染 PlanField 组件，集中展示方案字段所需的数据、状态和操作入口。 */
 function PlanField({
   label,
@@ -3103,11 +3727,9 @@ function PlanField({
   highlight?: boolean;
 }) {
   return (
-    <div className={`rounded-md px-3 py-2 ${highlight ? "bg-emerald-50" : "bg-slate-50"}`}>
-      <p className={`text-xs font-medium ${highlight ? "text-emerald-700" : "text-slate-500"}`}>
-        {label}
-      </p>
-      <p className="mt-1 text-sm leading-6 text-slate-800">{value || "-"}</p>
+    <div className={highlight ? "tint tint-ok" : "tint"}>
+      <span className="tint-lbl">{label}</span>
+      <p>{value || "-"}</p>
     </div>
   );
 }
@@ -3250,15 +3872,15 @@ function generatedVideos(content: Record<string, unknown>): Array<{
     .filter((item) => item.url);
 }
 
-/** 把素材状态状态映射为视觉样式，避免组件内散落条件分支。 */
+/** 把素材状态状态映射为徽标样式，避免组件内散落条件分支。 */
 function assetStatusTone(status: string): string {
   const tones: Record<string, string> = {
-    待评估: "bg-slate-100 text-slate-600",
-    通过: "bg-emerald-50 text-emerald-700",
-    弃用: "bg-rose-50 text-rose-700",
-    复测: "bg-amber-50 text-amber-700",
+    待评估: "badge badge-warn",
+    通过: "badge badge-online",
+    弃用: "badge badge-accent",
+    复测: "badge badge-warn",
   };
-  return tones[status] ?? "bg-slate-100 text-slate-600";
+  return tones[status] ?? "badge";
 }
 
 /** 把投放建议确认状态映射为中文显示文本，保持页面口径一致。 */
@@ -3271,14 +3893,14 @@ function adRecommendationConfirmationLabel(status: string): string {
   return labels[status] ?? "待人工确认";
 }
 
-/** 把投放建议确认状态映射为视觉样式，避免组件内散落条件分支。 */
+/** 把投放建议确认状态映射为徽标样式，避免组件内散落条件分支。 */
 function adRecommendationConfirmationTone(status: string): string {
   const tones: Record<string, string> = {
-    pending: "bg-amber-100 text-amber-700",
-    confirmed: "bg-emerald-100 text-emerald-700",
-    rejected: "bg-slate-100 text-slate-600",
+    pending: "badge-warn",
+    confirmed: "badge-online",
+    rejected: "",
   };
-  return tones[status] ?? "bg-amber-100 text-amber-700";
+  return tones[status] ?? "badge-warn";
 }
 
 /** 绝对地址媒体URL，封装当前页面重复使用的转换或展示规则，并统一处理空值边界。 */
