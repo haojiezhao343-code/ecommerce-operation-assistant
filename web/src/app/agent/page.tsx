@@ -185,36 +185,6 @@ const agentCss = `
     font-family: var(--font-mono); font-size: var(--fs-mini); line-height: 1.7; color: var(--fg-secondary);
   }
   .trace-dot.fail { background: var(--accent); }
-  /* 编排链（移植 7954 chat.html 的 .trace-name；.trace 容器/步骤/点/耗时由 design-system.css 提供） */
-  .trace-name { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem .5rem; min-width: 0; font-weight: 600; }
-  .trace-step-desc { font-family: var(--font-mono); font-size: var(--fs-mini); font-weight: 400; color: var(--faint); }
-  /* 专业 Agent 挂载行：在 18px|1fr|auto 三列基础上扩出两行满宽描述（description / version·tools） */
-  .trace-step--agent {
-    grid-template-columns: 18px minmax(0, 1fr) auto;
-    grid-template-areas:
-      "dot name time"
-      ". desc desc"
-      ". ver  ver";
-    align-items: start;
-    column-gap: .75rem;
-  }
-  .trace-step--agent > .trace-dot { grid-area: dot; margin-top: .375rem; }
-  .trace-step--agent > .trace-name { grid-area: name; }
-  .trace-step--agent > .trace-time { grid-area: time; }
-  .trace-step-desc--full { grid-column: 2 / -1; font-family: var(--font-mono); font-size: var(--fs-mini); font-weight: 400; color: var(--faint); line-height: 1.6; }
-  .trace-step--agent > .trace-step-desc:nth-of-type(2) { grid-area: desc; }
-  .trace-step--agent > .trace-step-desc:nth-of-type(3) { grid-area: ver; }
-
-  /* 协调者主卡：起点 done 点 + 左标题 / 右版本与徽标 */
-  .cat-coord { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--sp-4); align-items: center; }
-  .cat-coord-name { display: flex; align-items: flex-start; gap: .75rem; min-width: 0; }
-  .cat-coord-name > .trace-dot { flex: none; margin-top: .5rem; }
-  .cat-coord-name h3 { font-size: var(--fs-h2); margin: 0; }
-  .cat-coord-name .lede { font-size: var(--fs-body); line-height: 1.75; color: color-mix(in oklch, var(--bg) 78%, var(--fg)); margin: .375rem 0 0; }
-  .cat-coord-name .eyebrow { color: color-mix(in oklch, var(--bg) 66%, var(--fg)); }
-  .cat-coord-meta { display: flex; flex-direction: column; gap: var(--sp-2); align-items: flex-end; }
-  .cat-coord-meta .k { font-family: var(--font-mono); font-size: var(--fs-mini); color: color-mix(in oklch, var(--bg) 66%, var(--fg)); }
-  .coord-badge { color: var(--bg); border-color: color-mix(in oklch, var(--bg) 30%, transparent); }
 
   /* --- 审批收件箱 ---------------------------------------------------- */
   .approval-wrap { display: flex; flex-direction: column; gap: var(--sp-4); }
@@ -250,6 +220,21 @@ const agentCss = `
   .mem-side-hd { margin-bottom: var(--sp-3); }
   .mem-side-hd h2 { font-size: var(--fs-h3); }
 
+  /* --- Agent 目录 ---------------------------------------------------- */
+  .cat-coord { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--sp-4); align-items: center; }
+  .cat-coord h3 { font-size: var(--fs-h2); }
+  .cat-coord .lede { font-size: var(--fs-body); line-height: 1.75; color: color-mix(in oklch, var(--bg) 78%, var(--fg)); margin-top: .375rem; }
+  .cat-coord .eyebrow { color: color-mix(in oklch, var(--bg) 66%, var(--fg)); }
+  .cat-coord .k { display: block; font-family: var(--font-mono); font-size: var(--fs-mini); color: color-mix(in oklch, var(--bg) 66%, var(--fg)); }
+  .cat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-3); }
+  .cat { display: flex; flex-direction: column; gap: .375rem; padding: var(--sp-4); border: 1px solid var(--border); border-radius: var(--radius); }
+  .cat .key { font-family: var(--font-mono); font-size: var(--fs-mini); color: var(--faint); }
+  .cat b { font-size: var(--fs-meta); }
+  .cat .ver { font-family: var(--font-mono); font-size: var(--fs-mini); color: var(--accent); }
+  .cat p { font-size: var(--fs-body); line-height: 1.7; color: var(--muted); flex: 1; }
+  .cat .tools { font-family: var(--font-mono); font-size: var(--fs-mini); color: var(--faint); }
+  .coord-badge { color: var(--bg); border-color: color-mix(in oklch, var(--bg) 30%, transparent); }
+
   /* --- 空态 ---------------------------------------------------------- */
   .empty .ic { color: var(--faint); }
   .empty h3, .empty h4 { margin-top: var(--sp-3); color: var(--fg); }
@@ -283,6 +268,7 @@ const agentCss = `
 
   /* --- 响应式 -------------------------------------------------------- */
   @media (max-width: 1199px) {
+    .cat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
   @media (max-width: 1023px) {
@@ -297,7 +283,7 @@ const agentCss = `
     .cat-coord { grid-template-columns: minmax(0, 1fr); }
   }
   @media (max-width: 767px) {
-    .kpi-grid { grid-template-columns: minmax(0, 1fr); }
+    .kpi-grid, .cat-grid { grid-template-columns: minmax(0, 1fr); }
     .anchors { flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
     .anchors::-webkit-scrollbar { display: none; }
     .anchors a { flex: 0 0 auto; }
@@ -765,47 +751,31 @@ export default async function AgentCenter({ searchParams }: AgentCenterProps) {
 
               {catalog ? (
                 <>
-                  {/* 协调者主卡：编排链起点（done 点），版本 / 工具白名单 / 挂载数原样保留 */}
                   <section className="panel panel-inverted" style={{ marginBottom: "var(--sp-4)" }}>
                     <div className="panel-body">
                       <div className="cat-coord">
-                        <div className="cat-coord-name">
-                          <span className="trace-dot done" aria-hidden="true"></span>
-                          <div>
-                            <span className="eyebrow">Catalog Coordinator · 主智能体</span>
-                            <h3>{humanizeAgent(catalog.coordinator.key)}</h3>
-                            <p className="lede">{catalog.coordinator.description}</p>
-                          </div>
-                        </div>
-                        <span className="cat-coord-meta">
+                        <div>
+                          <span className="eyebrow">Catalog Coordinator · 主智能体</span>
+                          <h3>{humanizeAgent(catalog.coordinator.key)}</h3>
+                          <p className="lede">{catalog.coordinator.description}</p>
                           <span className="k">
-                            version {catalog.coordinator.version} · {catalog.coordinator.tools.length} 个允许工具 · 挂载 {catalog.agents.length} 个专业 Agent
+                            version {catalog.coordinator.version} · {catalog.coordinator.tools.length} 个允许工具 · {catalog.agents.length} 个已注册专业 Agent
                           </span>
-                          <span className="badge coord-badge">TOP-LEVEL</span>
-                        </span>
+                        </div>
+                        <span className="badge coord-badge">TOP-LEVEL</span>
                       </div>
                     </div>
                   </section>
 
-                  {/* 专业 Agent 编排挂载：.trace 运行轨迹语言（同 7954/8000），字段一个不丢 */}
-                  <div className="trace" aria-label="协调者挂载的专业 Agent 编排链">
-                    <div className="trace-hd">
-                      <span>编排挂载 · COORDINATION</span>
-                      <span className="mono-faint">协调者 → {catalog.agents.length} 个专业 Agent</span>
-                    </div>
-                    {catalog.agents.map((agent, idx) => (
-                      <div className="trace-step trace-step--agent" key={agent.key}>
-                        <span className="trace-dot done" aria-hidden="true"></span>
-                        <span className="trace-name">
-                          {humanizeAgent(agent.key)}
-                          <span className="trace-step-desc">{agent.key}</span>
-                        </span>
-                        <span className="trace-time mono">{String(idx + 1).padStart(2, "0")} / {String(catalog.agents.length).padStart(2, "0")}</span>
-                        <span className="trace-step-desc trace-step-desc--full">{agent.description}</span>
-                        <span className="trace-step-desc trace-step-desc--full">
-                          <span className="k">v{agent.version}</span> · {agent.tools.join(" · ") || "无允许工具"}
-                        </span>
-                      </div>
+                  <div className="cat-grid">
+                    {catalog.agents.map((agent) => (
+                      <article key={agent.key} className="cat">
+                        <span className="key">{agent.key}</span>
+                        <span className="ver">v{agent.version} · {agent.tools.length} 个允许工具</span>
+                        <b>{humanizeAgent(agent.key)}</b>
+                        <p>{agent.description}</p>
+                        <span className="tools">{agent.tools.join(" · ") || "—"}</span>
+                      </article>
                     ))}
                   </div>
                 </>
@@ -897,20 +867,9 @@ function TemplateCard({
       <p className="wf-desc">{workflow.description}</p>
       <div className="wf-block">
         <span>专家链 · AGENTS</span>
-        <div className="trace" aria-label="工作流专家编排链">
-          <div className="trace-hd">
-            <span>编排链 · ORCHESTRATION</span>
-            <span className="mono-faint">协调者 → {workflow.agents.length} 位专家</span>
-          </div>
-          {workflow.agents.map((agent, idx) => (
-            <div className="trace-step" key={agent}>
-              <span className="trace-dot done" aria-hidden="true"></span>
-              <span className="trace-name">
-                {humanizeAgent(agent)}
-                <span className="trace-step-desc">{agent}</span>
-              </span>
-              <span className="trace-time mono">{String(idx + 1).padStart(2, "0")} / {String(workflow.agents.length).padStart(2, "0")}</span>
-            </div>
+        <div className="tag-row">
+          {workflow.agents.map((agent) => (
+            <span key={agent} className="tag">{humanizeAgent(agent)}</span>
           ))}
         </div>
       </div>
