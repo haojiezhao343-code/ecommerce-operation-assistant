@@ -63,6 +63,9 @@ services:
       API_INTERNAL_BASE_URL: http://api:8000
       # 留空时页面拼出的分享与资源链接走相对路径，自动指向访客实际访问的地址。
       NEXT_PUBLIC_API_BASE_URL: ""
+      # 登录页「一键登录测试账号」使用的凭据；默认 demo 账号，可在 .env 覆盖。
+      DEMO_EMAIL: ${DEMO_EMAIL:-demo@example.com}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-Demo@123}
     ports:
       - "${WEB_PORT:-80}:3000"
     depends_on:

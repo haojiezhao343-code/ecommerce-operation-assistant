@@ -80,6 +80,8 @@ const loginCss = `
     background: var(--fg); color: var(--bg); font-size: 20px;
   }
   .signin-form { display: flex; flex-direction: column; gap: var(--sp-4); margin-top: var(--sp-5); }
+  .demo-signin { margin-top: var(--sp-3); }
+  .demo-signin .btn { min-height: 44px; }
   .input-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .375rem; }
   .btn-reveal {
     min-height: 44px; min-width: 58px; padding: 0 .75rem;
@@ -268,7 +270,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                         </svg>
                       </span>
                       <div>
-                        <p className="who">麦克思汉堡 · 运营智能体</p>
+                        <p className="who">运营智能体</p>
                         <h1>登录工作台</h1>
                       </div>
                     </div>
@@ -283,6 +285,13 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                         </p>
                       </div>
                     </div>
+
+                    <form action="/login/demo" method="post" className="demo-signin">
+                      <button type="submit" className="btn btn-primary btn-block">
+                        <svg className="ic ic-sm" aria-hidden="true"><use href="#i-chev"></use></svg>
+                        <span>一键登录测试账号</span>
+                      </button>
+                    </form>
 
                     {expired ? (
                       <div className="alert is-info" role="status">
