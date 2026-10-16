@@ -354,21 +354,21 @@ export default async function Home({ searchParams }: HomeProps) {
                     <span className={`tick${stepImportDone ? " is-done" : ""}`}>
                       {stepImportDone ? "已完成" : stepStoreDone ? "未开始" : "依赖 STEP 01"}
                     </span>
-                    <Link className="btn" href="/imports" aria-disabled={stepStoreDone ? undefined : "true"}>去导入中心</Link>
+                    <Link className="btn btn-primary" href="/imports" aria-disabled={stepStoreDone ? undefined : "true"}>去导入中心</Link>
                   </li>
                   <li className="onboard-step">
                     <span className="step-idx">STEP 03</span>
                     <h3>配置模型</h3>
                     <p>指定意图识别、向量化、生成的模型与密钥来源，配好后才能跑通 RAG 与文案生成。</p>
                     <span className="tick">{stepStoreDone ? "未开始" : "依赖 STEP 01"}</span>
-                    <Link className="btn" href="/settings" aria-disabled={stepStoreDone ? undefined : "true"}>去模型配置</Link>
+                    <Link className="btn btn-primary" href="/settings" aria-disabled={stepStoreDone ? undefined : "true"}>去模型配置</Link>
                   </li>
                   <li className="onboard-step">
                     <span className="step-idx">STEP 04</span>
                     <h3>启动 Agent</h3>
                     <p>开启竞品监控与素材生成子智能体，工作台开始出现真实数据与待办任务。</p>
                     <span className="tick">{stepStoreDone && stepImportDone ? "未开始" : "依赖 STEP 02 / 03"}</span>
-                    <Link className="btn" href="/agent" aria-disabled={stepStoreDone && stepImportDone ? undefined : "true"}>启动智能体</Link>
+                    <Link className="btn btn-primary" href="/agent" aria-disabled={stepStoreDone && stepImportDone ? undefined : "true"}>启动智能体</Link>
                   </li>
                 </ol>
               </div>
