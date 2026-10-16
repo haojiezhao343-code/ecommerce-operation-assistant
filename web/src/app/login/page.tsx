@@ -277,7 +277,10 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                       <svg className="ic" aria-hidden="true"><use href="#i-doc"></use></svg>
                       <div>
                         <b>演示凭据</b>
-                        <p>演示账号请向管理员获取。页面模板中不含任何账号、口令或可登录凭据。</p>
+                        <p>
+                          测试账号 <span className="mono">demo@example.com</span>，密码{" "}
+                          <span className="mono">Demo@123</span>，可直接登录体验。
+                        </p>
                       </div>
                     </div>
 
