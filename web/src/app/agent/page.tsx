@@ -432,7 +432,7 @@ export default async function AgentCenter({ searchParams }: AgentCenterProps) {
                 <article className="kpi">
                   <span className="kpi-lbl"><svg className="ic ic-sm" aria-hidden="true"><use href="#i-repo"></use></svg>版本化工作流</span>
                   <span className="kpi-val">{catalog?.workflows.length ?? 0}</span>
-                  <p className="kpi-desc">catalog.workflows.length。每个工作流都带版本号与默认风险等级，可评测、可回退。</p>
+                  <p className="kpi-desc">已启用工作流的数量。每个工作流都带版本号与默认风险等级，可评测、可回退。</p>
                   <div className="kpi-foot">
                     <span className="badge">CATALOG</span>
                     <span className="hint">{catalog?.workflows.map((wf) => `v${wf.version}`).join(" / ") || "—"}</span>
@@ -466,7 +466,7 @@ export default async function AgentCenter({ searchParams }: AgentCenterProps) {
                 <article className="kpi is-lead">
                   <span className="kpi-lbl"><svg className="ic ic-sm" aria-hidden="true"><use href="#i-warn"></use></svg>待处理审批</span>
                   <span className="kpi-val">{approvals.length}</span>
-                  <p className="kpi-desc">approvals.length。R2 / R3 副作用必须由策略层与数据库审批共同放行，这是唯一需要人动手的指标。</p>
+                  <p className="kpi-desc">待人工放行的审批数。R2 / R3 副作用必须由策略层与数据库审批共同放行，这是唯一需要人动手的指标。</p>
                   <div className="kpi-foot">
                     <span className="badge badge-accent">需要人工放行</span>
                     <a className="hint" href="#approval-inbox">去审批收件箱</a>
