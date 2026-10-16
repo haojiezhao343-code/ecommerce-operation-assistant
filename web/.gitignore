@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# 构建缓存重命名（mv .next 时的备份，避免误提交）
+.next-prev-*/

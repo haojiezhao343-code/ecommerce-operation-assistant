@@ -23,3 +23,77 @@
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: var(--radius); }
 ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+
+/* --------------------------------------------------------------------------
+   旧皮色板 → 设计 token 桥接（components/ 下 17 个内部表单/面板组件）
+   --------------------------------------------------------------------------
+   背景：8 个 page.tsx 已换皮（消费 design-system.css 的语义类 + oklch token），
+   但渲染在页面「内部」的 components/（商品/店铺/SKU/agent-run 等 17 个表单面板）
+   仍用 Tailwind 默认「冷色」工具类（slate/cyan/emerald/amber/rose/sky 共 ~610 处），
+   这就是运营智能体与另三个系统内部页「风格出入」的真正来源。
+
+   手法：Tailwind v4 把 bg-slate-200 编译成 var(--color-slate-200)。这里在 :root
+   重定义这些 --color-* 主题变量为设计系统 token —— 一处改、全部生效，
+   零组件代码改动、完全可回滚（删除本段即恢复 Tailwind 默认冷色）。
+   本文件 :root 未入 layer，级联权重高于 @theme 层，覆盖一定生效。
+
+   映射原则：冷中性灰 slate→暖墨/线/面；旧主色 cyan→朱红 --accent；
+   语义色 emerald→翠绿 success / amber→琥珀 warn / sky→蓝 info / rose(危险)→朱红 accent。
+   应用恒为浅色模式（layout 仅 className="js"，无 data-theme/dark 切换），
+   故 token 引用落到浅色档；将来开深色模式时这些引用自动跟随主题翻转。
+   -------------------------------------------------------------------------- */
+:root {
+  /* 中性灰 slate（463 处）：底/线/墨 三档对齐设计 */
+  --color-slate-50:  var(--surface-subtle); /* 浅填充底 */
+  --color-slate-100: var(--surface-subtle);
+  --color-slate-200: var(--border);         /* 发丝线（113 处 border 主用） */
+  --color-slate-300: var(--border);
+  --color-slate-400: var(--faint);          /* 中灰：占位/弱化字/次级线 */
+  --color-slate-500: var(--muted);          /* 次级文字（54 处 text） */
+  --color-slate-600: var(--fg-secondary);
+  --color-slate-700: var(--fg-secondary);   /* 正文级（68 处 text） */
+  --color-slate-800: var(--fg);             /* 深墨：暗实底块 / 深字 */
+  --color-slate-900: var(--fg);
+  --color-slate-950: var(--fg);             /* 主墨（82 处 text）/ 深色实心按钮底 */
+
+  /* 旧主色 cyan（44 处）→ 朱红 accent（与另三个系统主色统一） */
+  --color-cyan-50:  var(--accent-tint);
+  --color-cyan-100: var(--accent-tint);     /* focus 柔环 / 浅强调线 */
+  --color-cyan-600: var(--accent);          /* 强调描边（29 处 border） */
+  --color-cyan-700: var(--accent-solid);
+  --color-cyan-800: var(--accent);
+
+  /* emerald（43 处）→ 翠绿 success */
+  --color-emerald-50:  var(--success-tint);
+  --color-emerald-100: var(--success-tint); /* 在线柔环 */
+  --color-emerald-500: var(--border-success);
+  --color-emerald-600: var(--success);
+  --color-emerald-700: var(--success);
+
+  /* amber（29 处）→ 琥珀 warn */
+  --color-amber-50:  var(--warn-tint);
+  --color-amber-100: var(--warn-tint);      /* 进行中柔环 */
+  --color-amber-200: var(--border-warn);
+  --color-amber-500: var(--border-warn);
+  --color-amber-600: var(--warn);
+  --color-amber-700: var(--warn);
+  --color-amber-800: var(--warn);
+
+  /* rose（15 处，危险/删除）→ 朱红 accent（设计系统无独立 red，危险归朱红） */
+  --color-rose-50:  var(--accent-tint);
+  --color-rose-200: var(--border-accent);
+  --color-rose-300: var(--border-accent);
+  --color-rose-600: var(--accent);
+  --color-rose-700: var(--accent);
+
+  /* sky（15 处）→ 蓝 info */
+  --color-sky-50:  var(--info-tint);
+  --color-sky-100: var(--info-tint);        /* 信息柔环 */
+  --color-sky-500: var(--border-info);
+  --color-sky-600: var(--info);
+  --color-sky-700: var(--info);
+  --color-sky-900: var(--info);
+
+  /* 圆角：旧皮 rounded-md（6px）→ 设计统一 2px（158 处，与另三个系统一致） */
+  --radius-md: var(--radius);
+}
