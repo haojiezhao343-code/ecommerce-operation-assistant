@@ -42,6 +42,20 @@ services:
       BOOTSTRAP_EMAIL: ${BOOTSTRAP_EMAIL:-}
       BOOTSTRAP_PASSWORD: ${BOOTSTRAP_PASSWORD:-}
       BOOTSTRAP_DISPLAY_NAME: ${BOOTSTRAP_DISPLAY_NAME:-Demo Owner}
+      # 模型配置（2026-10-29 统一接入阿里云 token-plan 专属接入点：
+      # 文本走 compatible-mode，图片/视频走原生 /api/v1；三把 Key 均见同目录 .env，禁止入库）
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1}
+      LLM_API_KEY: "${LLM_API_KEY:?set LLM_API_KEY in .env}"
+      LLM_MODEL: ${LLM_MODEL:-qwen3.8-max}
+      IMAGE_PROVIDER: ${IMAGE_PROVIDER:-dashscope}
+      IMAGE_BASE_URL: ${IMAGE_BASE_URL:-https://token-plan.cn-beijing.maas.aliyuncs.com/api/v1}
+      IMAGE_API_KEY: "${IMAGE_API_KEY:?set IMAGE_API_KEY in .env}"
+      IMAGE_MODEL: ${IMAGE_MODEL:-wan2.7-image}
+      IMAGE_SIZE: ${IMAGE_SIZE:-1024*1024}
+      VIDEO_PROVIDER: ${VIDEO_PROVIDER:-dashscope}
+      VIDEO_BASE_URL: ${VIDEO_BASE_URL:-https://token-plan.cn-beijing.maas.aliyuncs.com/api/v1}
+      VIDEO_API_KEY: "${VIDEO_API_KEY:?set VIDEO_API_KEY in .env}"
+      VIDEO_MODEL: ${VIDEO_MODEL:-wan3.0-video}
     volumes:
       - api-uploads:/app/uploads
     depends_on:
