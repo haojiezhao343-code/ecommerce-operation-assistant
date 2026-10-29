@@ -130,6 +130,8 @@ const loginCss = `
   }
   .cred-note b { display: block; font-size: var(--fs-body); }
   .cred-note p { font-size: var(--fs-body); line-height: 1.7; color: var(--muted); }
+  .cred-note .cred-lines { margin-top: .25rem; display: flex; flex-direction: column; gap: .25rem; }
+  .cred-note .cred-lines .mono { font-family: var(--font-mono); font-size: var(--fs-mini); color: var(--fg-secondary); }
   .cred-note .ic { color: var(--muted); }
 
   @media (max-width: 1023px) {
@@ -229,7 +231,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                     <ul className="trust-list">
                       <li>
                         <svg className="ic" aria-hidden="true"><use href="#i-check"></use></svg>
-                        <span>页面不渲染任何账号、口令或口令片段；演示凭据一律向管理员线下获取。</span>
+                        <span>页面仅展示公开演示账号（一键登录使用）；owner 等真实账号凭据一律向管理员线下获取。</span>
                       </li>
                       <li>
                         <svg className="ic" aria-hidden="true"><use href="#i-check"></use></svg>
@@ -278,15 +280,19 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                     <div className="cred-note">
                       <svg className="ic" aria-hidden="true"><use href="#i-doc"></use></svg>
                       <div>
-                        <b>演示体验</b>
-                        <p>点击下方按钮可一键进入演示模式，无需账号密码；页面模板中不含任何账号、口令或可登录凭据。</p>
+                        <b>演示账号 · 可直接体验</b>
+                        <div className="cred-lines">
+                          <span>账号：<span className="mono">demo@example.com</span></span>
+                          <span>密码：<span className="mono">Demo@123</span></span>
+                        </div>
+                        <p>推荐直接使用下方一键登录；也可以在表单中手动输入以上账号体验完整登录流程。</p>
                       </div>
                     </div>
 
                     <form action="/login/demo" method="post" className="demo-signin">
                       <button type="submit" className="btn btn-primary btn-block">
                         <svg className="ic ic-sm" aria-hidden="true"><use href="#i-chev"></use></svg>
-                        <span>一键登录测试账号</span>
+                        <span>一键登录演示账号</span>
                       </button>
                     </form>
 
