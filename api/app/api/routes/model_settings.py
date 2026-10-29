@@ -116,7 +116,10 @@ def _test_image_model() -> dict:
             task_id = _create_jimeng_image_task(prompt, settings)
         elif settings.image_model == "wan2.6-t2i":
             task_id = _create_dashscope_wan26_text_to_image_task(prompt, settings)
-        elif settings.image_model == "wan2.6-image":
+        elif settings.image_model in {"wan2.6-image", "wan2.7-image", "wan2.7-image-pro"}:
+            # 与 image_generation 主流程保持一致：wan2.6-image / wan2.7-image 系走同步
+            # multimodal-generation 端点。token-plan 接入点不支持 text2image 异步调用（403），
+            # 若这里漏判会落到 else 分支，把配置正常的图片模型误报成 502 Bad Gateway。
             result = _create_dashscope_wan26_image(prompt, settings)
             task_id = str(result.get("request_id") or "")
         else:
