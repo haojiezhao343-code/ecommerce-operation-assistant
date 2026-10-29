@@ -10,8 +10,8 @@
    本文件只放接入与基座补丁，不引入任何新数值。
    ========================================================================== */
 
-@import "./design-system.css" layer(components);
 @import "tailwindcss";
+@import "./design-system.css" layer(components);
 
 /* ---- 应用级基座补丁（取值全部来自设计系统 token） ---- */
 
