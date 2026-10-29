@@ -257,8 +257,8 @@ def _set_secret_if_present(row: ModelProviderSetting, payload: dict) -> None:
 def _mask_secret(value: str | None) -> str:
     """脱敏密钥，统一主流程中的格式、默认值和异常边界。"""
     # 按“输入归一化 → 业务校验 → 状态或持久化”推进，异常不得留下半完成结果。
+    # 2026-10-29 收紧：不再回显任何明文前缀/后缀片段（原实现暴露前7后6位），
+    # 前端凭据界面只允许出现固定掩码，杜绝部分凭据泄漏。
     if not value:
         return ""
-    if len(value) <= 12:
-        return f"{value[:3]}...{value[-3:]}"
-    return f"{value[:7]}...{value[-6:]}"
+    return "****"

@@ -61,7 +61,11 @@ def generate_main_image_asset(
         task_id = _create_dashscope_wan26_text_to_image_task(prompt, settings)
         result = _poll_dashscope_task(task_id, settings)
         image_url = _extract_dashscope_wan26_task_image_url(result)
-    elif settings.image_model == "wan2.6-image":
+    elif settings.image_model in {"wan2.6-image", "wan2.7-image", "wan2.7-image-pro"}:
+        # wan2.6-image / wan2.7-image 系走同步 multimodal-generation 端点。
+        # 2026-10-29 实测：token-plan 接入点不支持 text2image 异步调用（403），
+        # 同步 multimodal 路径返回 output.choices[].message.content[].image，
+        # 与 _extract_dashscope_wan26_image_url 的解析结构一致。
         result = _create_dashscope_wan26_image(prompt, settings)
         task_id = result.get("request_id", "")
         image_url = _extract_dashscope_wan26_image_url(result)
