@@ -278,11 +278,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                     <div className="cred-note">
                       <svg className="ic" aria-hidden="true"><use href="#i-doc"></use></svg>
                       <div>
-                        <b>演示凭据</b>
-                        <p>
-                          测试账号 <span className="mono">demo@example.com</span>，密码{" "}
-                          <span className="mono">Demo@123</span>，可直接登录体验。
-                        </p>
+                        <b>演示体验</b>
+                        <p>点击下方按钮可一键进入演示模式，无需账号密码；页面模板中不含任何账号、口令或可登录凭据。</p>
                       </div>
                     </div>
 
